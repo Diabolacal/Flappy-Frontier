@@ -1,0 +1,60 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true
+    },
+
+    // Reduce search noise from vendor submodule build artifacts and generated
+    // files. Vendor source code and docs remain searchable.
+    "search.exclude": {
+        "**/vendor/**/node_modules": true,
+        "**/vendor/**/build": true,
+        "**/vendor/**/dist": true,
+        "**/vendor/**/target": true,
+        "**/vendor/**/docker/workspace-data": true,
+        "**/vendor/**/.turbo": true,
+        "**/vendor/**/Move.lock": true
+    },
+
+    // Prevent TS language server from discovering tsconfig files inside vendor
+    // submodules (their deps are not installed, causing spurious TS errors).
+    "typescript.tsserver.watchOptions": {
+        "excludeDirectories": ["**/vendor/**"]
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // VS Code 1.109+ – Agent & Memory Settings
+    // ─────────────────────────────────────────────────────────────────────────
+
+    "chat.useAgentsMdFile": true,
+    "chat.useAgentSkills": true,
+    "github.copilot.chat.copilotMemory.enabled": true,
+    "github.copilot.chat.searchSubagent.enabled": true,
+    "github.copilot.chat.organizationInstructions.enabled": true,
+
+    "github.copilot.chat.codeGeneration.instructions": [
+        { "file": ".github/copilot-instructions.md" }
+    ],
+
+    "chat.tools.terminal.enableAutoApprove": false,
+    "chat.tools.terminal.autoApproveWorkspaceNpmScripts": true,
+    "chat.tools.terminal.preventShellHistory": true,
+
+    "chat.promptFilesRecommendations": {
+        "plan": true
+    },
+
+    "workbench.secondarySideBar.defaultVisibility": "visible",
+    "chat.math.enabled": true,
+    "chat.agent.maxRequests": 100,
+    "chat.autopilot.enabled": true,
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // VS Code 1.110 – Agentic Browser Tools (Experimental)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    "workbench.browser.enableChatTools": true
+}

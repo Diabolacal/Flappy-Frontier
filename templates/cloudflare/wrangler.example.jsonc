@@ -1,0 +1,19 @@
+{
+  // Wrangler Configuration Template (Cloudflare Pages + Workers)
+  //
+  // USAGE:
+  //   1. Copy this file to your frontend directory as wrangler.jsonc
+  //   2. Replace all {{PLACEHOLDER}} values with actual IDs
+  //   3. Set secrets via: wrangler pages secret put <NAME>
+
+  "name": "{{PROJECT_NAME}}",
+  "compatibility_date": "{{COMPATIBILITY_DATE}}",
+  "pages_build_output_dir": "dist",
+
+  "kv_namespaces": [
+    {
+      "binding": "MY_KV",
+      "id": "{{KV_NAMESPACE_ID}}"
+    }
+  ]
+}

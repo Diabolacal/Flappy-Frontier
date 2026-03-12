@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "GitHub.copilot-chat",
+    "humao.rest-client",
+    "GitHub.vscode-pull-request-github"
+  ],
+
+  "unwantedRecommendations": [
+    "GitHub.copilot"
+  ]
+}

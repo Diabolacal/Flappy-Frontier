@@ -1,0 +1,68 @@
+{
+    // Sui Move development tasks for the Flappy Frontier hackathon project.
+    // Most tasks prompt for a package path via ${input:movePkgPath}.
+    "version": "2.0.0",
+    "inputs": [
+        {
+            "id": "movePkgPath",
+            "description": "Relative path to the Move package directory (e.g., contracts/flappy_frontier)",
+            "type": "promptString",
+            "default": "contracts/flappy_frontier"
+        }
+    ],
+    "tasks": [
+        {
+            "label": "Sui: Move Build",
+            "type": "shell",
+            "command": "sui move build --path ${input:movePkgPath}",
+            "group": "build",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Sui: Move Test",
+            "type": "shell",
+            "command": "sui move test --path ${input:movePkgPath}",
+            "group": "test",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Sui: Client Active Env",
+            "type": "shell",
+            "command": "sui client active-env",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Sui: Client Envs",
+            "type": "shell",
+            "command": "sui client envs",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Sui: Publish (interactive)",
+            "type": "shell",
+            "command": "sui client publish --path ${input:movePkgPath}",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": true
+            }
+        }
+    ]
+}

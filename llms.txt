@@ -1,0 +1,31 @@
+# Flappy Frontier — LLM Documentation Index
+
+> Machine-readable project map for LLM agents. Updated: 2026-03-12.
+
+## Project Identity
+- Name: Flappy Frontier
+- Type: Hackathon submission (EVE Frontier, March 2026)
+- Stack: Canvas 2D + React + Vite (frontend) | Sui Move (contracts) | Cloudflare Pages (deploy)
+
+## Critical Agent Files
+- .github/copilot-instructions.md — Repo-wide guardrails, CLI policy, quality gates (MUST READ)
+- AGENTS.md — Agent context, project facts, boundaries (MUST READ)
+- docs/decision-log.md — Technical decisions log (newest first)
+
+## Documentation Map
+- docs/README.md — Documentation index
+- docs/strategy/flappy-frontier-product-vision.md — Full product vision, architecture, economic model
+- docs/research/capabilities.json — EVE Frontier in-game browser capabilities (787×1198px, Canvas 2D, no wallet)
+- docs/core/hackathon-repo-conventions.md — Git workflow, file discipline, naming conventions
+
+## Code Entry Points
+- contracts/flappy_frontier/ — Sui Move package (leaderboard, treasury, game seeding)
+- frontend/ — React + Canvas 2D game (to be created)
+- vendor/ — Git submodules (world-contracts, builder-scaffold, evevault, builder-documentation)
+
+## Key Constraints
+- In-game viewport: 787×1198px portrait, DPR 1, Chrome 122
+- No Sui wallet in CEF webview — in-game is free-play only
+- Score verification: client-trusted (documented tradeoff)
+- sui::random for provably fair seeding
+- Weekly automated payouts via Clock + trigger_payout()
