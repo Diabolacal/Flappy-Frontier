@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="78" height="20" viewBox="0 0 78 20">
+  <defs>
+    <linearGradient id="capGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FF5050"/>
+      <stop offset="50%" stop-color="#E03535"/>
+      <stop offset="100%" stop-color="#A01818"/>
+    </linearGradient>
+  </defs>
+  <rect width="78" height="20" rx="2" fill="url(#capGrad)"/>
+  <!-- Top edge highlight -->
+  <rect x="0" y="0" width="78" height="2" rx="1" fill="#FF7070" opacity="0.6"/>
+  <!-- Rivet details -->
+  <circle cx="10" cy="10" r="2" fill="#B02020"/>
+  <circle cx="39" cy="10" r="2" fill="#B02020"/>
+  <circle cx="68" cy="10" r="2" fill="#B02020"/>
+</svg>

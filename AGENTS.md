@@ -65,6 +65,7 @@ Authoritative language for every mandate lives in `.github/copilot-instructions.
 4. Sensitive edits: Treat game loop, Move contracts, and treasury logic as sensitive; ask before structural changes.
 5. Feature branch deploys: Always use feature-branch-scoped preview deploys. Never deploy feature branches to production.
 6. **Automated error recovery**: If a build, typecheck, or test fails after your patch, self-diagnose, explain the cause in plain English, apply a fix, and re-run the gate. Only escalate if a fix attempt also fails.
+7. **Plan/status documentation update (mandatory).** After any meaningful implementation pass, update the project plan/status document (`docs/plans/flappy-frontier-game-mvp-plan.md`) before considering the task complete. Chat summaries are not a substitute for repo documentation. Status + next steps must be written into the repo for cross-session continuity.
 
 ## Code & Repo Conventions
 

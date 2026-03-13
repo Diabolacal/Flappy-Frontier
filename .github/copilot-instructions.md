@@ -180,6 +180,7 @@ If user asks for broad refactor, first propose smallest path to accomplish user-
 ### Cross-Cutting
 - **Error recovery:** If any gate fails, the agent must self-diagnose and attempt a fix before reporting to the user. See Vibe Coding rule 8 for the full protocol. Never present raw compiler output to a non-coder without a plain-English explanation and proposed fix.
 - Run the relevant checks yourself whenever tooling is available. If a gate cannot be executed (e.g., missing dependency, platform constraint), call it out explicitly with the command you would have run and any fallback validation performed.
+- **Plan/status documentation update (mandatory).** After any meaningful implementation pass (feature, fix, or repair), the agent must update the project plan/status document (`docs/plans/flappy-frontier-game-mvp-plan.md`) before considering the task complete. Implementation summaries in chat are **not** a substitute for repo documentation. If the repo will be continued in future chats, status and next steps must be written into the repo — not left only in conversation history.
 
 ## Decision Log Template
 ```

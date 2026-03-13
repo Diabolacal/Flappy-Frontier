@@ -38,6 +38,12 @@ Central map for all project documentation. Agents: start here for orientation.
 |----------|-------------|
 | `docs/operations/DECISIONS_TEMPLATE.md` | Template for decision log entries |
 
+## Plans
+
+| Document | Description |
+|----------|-------------|
+| `docs/plans/flappy-frontier-game-mvp-plan.md` | Game-side MVP implementation plan — rendering, physics, state model, assets, build phases |
+
 ## Architecture
 
 *Architecture docs will be added as implementation progresses.*
