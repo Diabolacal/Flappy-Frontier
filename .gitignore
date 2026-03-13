@@ -30,6 +30,14 @@ build/
 *.tgz
 .npm
 .eslintcache
+package-lock.json
+
+# Vite cache
+.vite/
+
+# Reference images (not game assets)
+*-reference.png
+*-reference.jpg
 
 # Python (if applicable)
 __pycache__/

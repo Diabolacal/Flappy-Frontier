@@ -43,6 +43,7 @@ Central map for all project documentation. Agents: start here for orientation.
 | Document | Description |
 |----------|-------------|
 | `docs/plans/flappy-frontier-game-mvp-plan.md` | Game-side MVP implementation plan — rendering, physics, state model, assets, build phases |
+| `docs/plans/flappy-frontier-chain-integration-plan.md` | Chain integration execution plan — Move contracts, wallet wiring, Cloudflare deployment, Utopia validation |
 
 ## Architecture
 

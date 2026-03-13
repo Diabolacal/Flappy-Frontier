@@ -14,7 +14,7 @@
 
 Flappy Frontier is a Flappy Bird-style side-scrolling game themed for the EVE Frontier universe. Players fly through procedurally generated obstacles, submit scores to an on-chain leaderboard backed by Sui, and compete for weekly automated payouts funded by entry fees.
 
-The game demonstrates four Sui primitives in a lightweight, immediately playable package: native randomness (`sui::random`), time-based automation (`Clock`), on-chain state management (leaderboard via `vector`), and token-gated participation (`Coin<SUI>`). It is not a governance tool — it is a player engagement weapon designed to drive player votes (25% of Best Entry score) while standing alone as a complete Sui integration showcase.
+The game demonstrates four Sui primitives in a lightweight, immediately playable package: native randomness (`sui::random`), time-based automation (`Clock`), on-chain state management (leaderboard via `vector`), and token-gated participation (`Coin<EVE>` via generic `Coin<T>`). It is not a governance tool — it is a player engagement weapon designed to drive player votes (25% of Best Entry score) while standing alone as a complete Sui integration showcase.
 
 **Build budget:** 10–16 hours LLM-assisted.  
 **Kill criteria:** Abandon if Canvas 2D game loop isn't playable within 6 hours.
@@ -58,7 +58,7 @@ No admin. No manual payout. No maintenance. The game runs itself.
 ```
 ┌─────────────┐     ┌──────────────┐     ┌───────────────┐
 │  View        │     │  Pay Entry   │     │  Play Game    │
-│  Leaderboard │────►│  Fee (1 SUI) │────►│  (Canvas 2D)  │
+│  Leaderboard │────►│  Fee (EVE)   │────►│  (Canvas 2D)  │
 │  + Prize Pool│     │  + Get Seed  │     │  Deterministic │
 └─────────────┘     └──────────────┘     └───────┬───────┘
                                                   │
@@ -74,7 +74,7 @@ No admin. No manual payout. No maintenance. The game runs itself.
 
 1. **View** — Landing page shows leaderboard (top 10 with addresses, scores, timestamps) and current prize pool balance. Gameplay demo loops in background.
 2. **Authenticate** — Player connects Sui wallet (EVE Vault or any `@mysten/wallet-standard` compatible wallet in external browser).
-3. **Pay + Seed** — Player pays entry fee via `Coin<SUI>`. The transaction calls `start_run()`, which draws a seed from `sui::random` and returns it. Fee goes into treasury `Balance<SUI>`.
+3. **Pay + Seed** — Player pays entry fee via `Coin<EVE>` (resolved at runtime using generic `Coin<T>`). The transaction calls `start_run()`, which draws a seed from `sui::random` and returns it. Fee goes into treasury `Balance<T>` (instantiated with EVE).
 4. **Play** — Canvas 2D game uses the on-chain seed to deterministically generate obstacles. Constrained randomness ensures no impossible layouts. Run has a maximum time limit (e.g., 120 seconds) to prevent infinite games.
 5. **Submit** — Player calls `submit_score()` with their score and run ID. The leaderboard updates if the score qualifies for top 10.
 6. **Repeat or wait** — Play again (new fee, new seed) or wait for weekly payout.
@@ -89,7 +89,7 @@ No admin. No manual payout. No maintenance. The game runs itself.
 |-----------|-------|---------|
 | **`sui::random`** | Seed generation for each run — on-chain, verifiable, unpredictable | Provably fair game seeding; no server-side RNG needed |
 | **`Clock`** | Weekly epoch boundaries (payout trigger), run expiry enforcement | Autonomous lifecycle — no admin cron job |
-| **`Coin<SUI>` / `Balance<SUI>`** | Entry fees paid into shared treasury; payouts disbursed from treasury | Self-sustaining economic loop |
+| **`Coin<EVE>` / `Balance<T>`** | Entry fees paid into shared treasury; payouts disbursed from treasury | Self-sustaining economic loop using EVE token (generic `Coin<T>` / `Balance<T>` in contracts) |
 | **On-chain leaderboard (`vector`)** | Top 10 stored as a sorted vector inside a shared `Leaderboard` object | Fully transparent ranking — anyone can verify |
 | **Shared objects** | `Leaderboard` and `Treasury` are shared, enabling concurrent multi-player interaction | Standard Sui shared-object consensus |
 | **Events** | `RunStarted`, `ScoreSubmitted`, `PayoutExecuted`, `LeaderboardReset` | Off-chain indexing for UI reactivity |
@@ -112,10 +112,10 @@ public struct LeaderboardEntry has store, copy, drop {
     timestamp_ms: u64,
 }
 
-public struct Treasury has key {
+public struct Treasury<phantom T> has key {
     id: UID,
-    balance: Balance<SUI>,
-    entry_fee_mist: u64,
+    balance: Balance<T>,
+    entry_fee_amount: u64,
     payout_shares: vector<u64>,  // e.g., [50, 30, 20] for top 3
 }
 ```
@@ -137,7 +137,7 @@ public struct Treasury has key {
 | **Run seed is unpredictable** | `sui::random` produces seed at transaction time; cannot be front-run by player within same PTB | Strong |
 | **Seed is verifiable** | Seed stored in `RunStarted` event; anyone can regenerate the obstacle layout | Strong |
 | **No impossible layouts** | Constrained randomness algorithm: pipe gaps bounded between min/max, vertical deltas capped, minimum horizontal spacing | Strong (deterministic from seed) |
-| **Entry fees are locked** | `Balance<SUI>` inside shared `Treasury` object — no unilateral withdrawal | Strong |
+| **Entry fees are locked** | `Balance<T>` (EVE) inside shared `Treasury<T>` object — no unilateral withdrawal | Strong |
 | **Payouts are automated** | Anyone can call `trigger_payout()` when epoch expires; no admin key required | Strong |
 | **Leaderboard is transparent** | All entries on-chain with player address, score, and seed | Strong |
 
@@ -169,7 +169,7 @@ public struct Treasury has key {
 ### Fee Flow
 
 ```
-Player ──[1 SUI entry fee]──► Treasury (Balance<SUI>)
+Player ──[100 EVE entry fee]──► Treasury (Balance<T>)
                                     │
                          ┌──────────┴──────────┐
                          │  Weekly epoch ends    │
@@ -186,18 +186,25 @@ Player ──[1 SUI entry fee]──► Treasury (Balance<SUI>)
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| **Entry fee** | 0.1 SUI (~$0.05 at current rates) | Low enough for casual play; high enough to discourage spam submissions. Display Lux equivalent if exchange rate is available. |
+| **Entry fee** | 100 EVE (~10,000 LUX; 100_000_000_000 base units at 9 decimals) | Low enough for casual play; high enough to discourage spam submissions. Configurable at deploy. Display LUX equivalent in UI. |
 | **Payout split** | 50 / 30 / 20 (top 3) | Standard competitive distribution. Stored as `payout_shares` vector — trivially adjustable. |
 | **Epoch duration** | 7 days (604,800,000 ms) | Weekly reset gives enough time for competition to develop and enough freshness to sustain engagement. |
 | **Max leaderboard size** | 10 | Enough for competitive tension; small enough for a single `vector` without DF overhead. |
 | **Run time limit** | 120 seconds | Prevents infinite runs. Client enforces; chain verifies submission timestamp vs. run start. |
 
-### Treasury Safety
+### Treasury Safety & Custody Trust Model
 
-- `Treasury` is a shared object. No admin withdrawal function exists.
-- `trigger_payout()` is callable by anyone when the epoch has expired. This means no admin key is needed and no maintenance is required.
+**Non-custodial treasury (hard constraint):** Entry-fee EVE tokens never route to, rest in, or are recoverable by the operator's personal wallet during normal game operation. The prize pool is held entirely in on-chain contract state.
+
+- `Treasury<T>` is a shared object. **No admin withdrawal function exists.** No function allows any holder — including `AdminCap` — to withdraw, redirect, or drain treasury funds.
+- `trigger_payout()` is callable by anyone when the epoch has expired. Payout follows the `payout_shares` vector deterministically — no operator discretion.
 - If no scores are submitted in an epoch, the treasury rolls over to the next epoch.
-- The deployer has no special privileges after `init()`. This is a credibly neutral game.
+- The deployer has no special privileges over funds after `init()`. This is a credibly neutral game.
+- Players can inspect the treasury balance at any time via `suiClient.getObject()` — the prize pool is transparently readable on-chain.
+
+**AdminCap scope (narrow):** `AdminCap` exists solely for non-fund parameter adjustments (epoch duration, entry fee amount). It grants no ability to move, withdraw, or redirect treasury balance. This is a hard implementation constraint.
+
+**Score authenticity vs. custody:** Score authenticity is an accepted hackathon-scope limitation (see §6 above). Treasury custody is a separate, stronger guarantee — even if a fraudulent score were submitted, fund flows remain trustless and rule-driven. These concerns are independent.
 
 ### Edge Cases
 
@@ -266,12 +273,11 @@ Mon    Tue    Wed    Thu    Fri    Sat    Sun 00:00 UTC
 |---------|---------------------|
 | **Cheat-proof score verification** | Multi-month engineering effort; accepted tradeoff (see §6) |
 | **In-game wallet integration** | CEF webview does not support Sui wallet extensions; in-game = free-play only |
-| **`Coin<EVE>` entry fees** | `Coin<EVE>` availability on hackathon test server is unvalidated; SUI is safe default |
 | **Multiple game modes** | Single mode. No difficulty levels, no power-ups, no cosmetics. |
 | **Mobile-optimized UI** | External browser desktop is primary; portrait layout for CEF compatibility is a bonus, not a requirement |
 | **Replay system** | No recording/replay of runs; scores are fire-and-forget |
-| **Admin functions** | No admin key, no pause, no fee adjustment post-deployment. Redeploy if parameters need changing. |
-| **Sponsored transactions** | Players pay their own gas. Entry fee is the primary cost; gas is marginal. |
+| **Admin fund access** | No admin withdrawal, drain, or fund-redirect capability. `AdminCap` is scoped to parameter tuning (epoch duration, fee amount) only — never fund movement. Redeploy for structural changes. |
+| **Sponsored transactions** | Gas handling depends on wallet/runtime flow (may be user-paid or sponsored). Not a blocker for Move contract design. |
 | **SSU/gate integration** | Flappy Frontier is standalone — no world-contracts dependencies |
 
 ### In-Game Viability
@@ -298,7 +304,7 @@ Per the [in-game DApp surface analysis](../../architecture/in-game-dapp-surface.
 | 3 | **Shared object contention on leaderboard** | Very Low | Low — occasional tx retry | Top 10 vector is small. Contention only matters if many players submit simultaneously. At hackathon scale, this is negligible. |
 | 4 | **Score fraud undermines leaderboard** | Medium | Low for hackathon — demo integrity is controlled | Economic friction (entry fee) + public attribution + time window. Acceptable for demo. Document as known limitation. |
 | 5 | **Client-side time manipulation** | Low | Low — run expiry bypass | Chain verifies `submit_score()` timestamp vs. `start_run()` timestamp. Client manipulation doesn't affect chain-side enforcement. |
-| 6 | **Entry fee too high / too low** | Low | Low — parameter tuning | Configurable at deploy. Default 0.1 SUI. Adjust based on hackathon test server token economics. |
+| 6 | **Entry fee too high / too low** | Low | Low — parameter tuning | Configurable at deploy. Default 100 EVE (~10,000 LUX). Adjust based on hackathon test server token economics. |
 | 7 | **Weekly payout never triggered** | Very Low | Medium — prizes stuck | `trigger_payout()` is public — any external caller can trigger it. The demo explicitly shows this call. Worst case: deployer triggers it manually. |
 | 8 | **CivilizationControl not demo-stable by Day 7** | Medium | Critical — Flappy Frontier never gets built | Hard gate: no sprint entries until CC produces watchable demo. If CC consumes all time, Flappy is cut. Portfolio strategy accounts for this. |
 
