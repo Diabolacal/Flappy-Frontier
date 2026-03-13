@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 48">
+  <defs>
+    <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#555A61"/>
+      <stop offset="100%" stop-color="#3A3D42"/>
+    </linearGradient>
+    <linearGradient id="cockpit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3A6A8A"/>
+      <stop offset="100%" stop-color="#1A3A5A"/>
+    </linearGradient>
+  </defs>
+  <!-- Main hull body - angular wedge shape inspired by EVE capital ship silhouette -->
+  <path d="M88 22 L72 8 L20 6 L6 14 L4 20 L4 28 L6 34 L20 42 L72 40 L88 26 Z" fill="url(#hull)"/>
+  <!-- Upper hull plate -->
+  <path d="M72 8 L20 6 L18 12 L70 13 Z" fill="#4A4E54"/>
+  <!-- Lower hull plate -->
+  <path d="M20 42 L72 40 L70 35 L18 36 Z" fill="#3D4147"/>
+  <!-- Central hull ridge -->
+  <path d="M70 13 L18 12 L16 18 L16 30 L18 36 L70 35 L72 28 L72 20 Z" fill="#4A4E54"/>
+  <!-- Panel line details - horizontal -->
+  <line x1="16" y1="20" x2="72" y2="19" stroke="#2E3136" stroke-width="0.8"/>
+  <line x1="16" y1="28" x2="72" y2="29" stroke="#2E3136" stroke-width="0.8"/>
+  <!-- Panel line details - vertical -->
+  <line x1="35" y1="8" x2="34" y2="40" stroke="#2E3136" stroke-width="0.7"/>
+  <line x1="55" y1="9" x2="54" y2="39" stroke="#2E3136" stroke-width="0.7"/>
+  <!-- Port-side hull indents (inspired by reference ship's recessed panels) -->
+  <rect x="38" y="14" width="12" height="6" rx="1" fill="#3A3D42"/>
+  <rect x="38" y="28" width="12" height="6" rx="1" fill="#3A3D42"/>
+  <rect x="58" y="15" width="8" height="5" rx="1" fill="#3A3D42"/>
+  <rect x="58" y="28" width="8" height="5" rx="1" fill="#3A3D42"/>
+  <!-- Cockpit window -->
+  <path d="M78 18 L72 16 L72 22 L80 21 Z" fill="url(#cockpit)"/>
+  <path d="M80 21 L72 22 L72 28 L80 27 L82 24 Z" fill="#2A4A6A" opacity="0.7"/>
+  <!-- Engine housing (rear) -->
+  <rect x="2" y="16" width="6" height="16" rx="1" fill="#2E3136"/>
+  <rect x="1" y="18" width="4" height="12" rx="1" fill="#252830"/>
+  <!-- Subtle antenna/sensor on top -->
+  <rect x="44" y="4" width="2" height="3" fill="#6A6E74"/>
+</svg>
