@@ -13,7 +13,7 @@ export function StartScreen({ bestScore, onStart }: StartScreenProps) {
         <h1 className="text-4xl font-bold tracking-widest text-white mb-1">
           FLAPPY
         </h1>
-        <h1 className="text-4xl font-bold tracking-widest text-emerald-400">
+        <h1 className="text-4xl font-bold tracking-widest text-orange-400">
           FRONTIER
         </h1>
       </div>

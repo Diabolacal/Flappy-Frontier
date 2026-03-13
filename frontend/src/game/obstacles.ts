@@ -2,14 +2,10 @@ import type { GameState } from './types';
 import {
   CANVAS_WIDTH,
   PIPE_WIDTH,
-  PIPE_GAP,
-  PIPE_SPEED,
   PIPE_SPACING,
-  GAP_Y_MIN_PCT,
-  GAP_Y_MAX_PCT,
-  GAP_DELTA_CAP,
   PLAY_AREA_HEIGHT,
 } from './constants';
+import { getDifficulty } from './progression';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -22,15 +18,16 @@ export function shouldSpawnPipe(state: GameState): boolean {
 }
 
 export function spawnPipe(state: GameState): void {
+  const diff = getDifficulty(state.score);
   const margin = 40;
-  const minY = PLAY_AREA_HEIGHT * GAP_Y_MIN_PCT + PIPE_GAP / 2 + margin;
-  const maxY = PLAY_AREA_HEIGHT * GAP_Y_MAX_PCT - PIPE_GAP / 2 - margin;
+  const minY = PLAY_AREA_HEIGHT * diff.gapYMinPct + diff.pipeGap / 2 + margin;
+  const maxY = PLAY_AREA_HEIGHT * diff.gapYMaxPct - diff.pipeGap / 2 - margin;
 
   let gapCenterY = minY + state.rng.next() * (maxY - minY);
 
   if (state.pipes.length > 0) {
     const prevGap = state.pipes[state.pipes.length - 1]!.gapCenterY;
-    const maxDelta = PIPE_GAP * GAP_DELTA_CAP;
+    const maxDelta = diff.pipeGap * diff.gapDeltaCap;
     gapCenterY = clamp(gapCenterY, prevGap - maxDelta, prevGap + maxDelta);
     gapCenterY = clamp(gapCenterY, minY, maxY);
   }
@@ -38,13 +35,16 @@ export function spawnPipe(state: GameState): void {
   state.pipes.push({
     x: CANVAS_WIDTH + PIPE_WIDTH,
     gapCenterY,
+    gapSize: diff.pipeGap,
     scored: false,
   });
 }
 
 export function updateObstacles(state: GameState, dt: number): void {
+  const diff = getDifficulty(state.score);
+
   for (const pipe of state.pipes) {
-    pipe.x -= PIPE_SPEED * dt;
+    pipe.x -= diff.pipeSpeed * dt;
   }
 
   // Remove offscreen pipes

@@ -51,6 +51,12 @@ export function GameCanvas({
     return () => {
       loopRef.current?.stop();
       loopRef.current = null;
+      // Clear canvas so old frames don't bleed through menu overlay
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
     };
   }, [isActive, mode, initLoop]);
 

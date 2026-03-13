@@ -3,6 +3,7 @@ import {
   GRAVITY,
   JUMP_VELOCITY,
   TERMINAL_VELOCITY,
+  SHIP_HEIGHT,
   PITCH_FACTOR,
   MAX_PITCH_UP,
   MAX_PITCH_DOWN,
@@ -43,8 +44,8 @@ export function updatePhysics(
   }
 
   // Ground collision
-  if (state.shipY >= PLAY_AREA_HEIGHT - 36) {
-    state.shipY = PLAY_AREA_HEIGHT - 36;
+  if (state.shipY >= PLAY_AREA_HEIGHT - SHIP_HEIGHT) {
+    state.shipY = PLAY_AREA_HEIGHT - SHIP_HEIGHT;
     if (state.phase === 'dying') {
       state.phase = 'dead';
     }
@@ -68,8 +69,8 @@ export function updateDying(state: GameState, dt: number): void {
   state.shipY += state.shipVelocity * dt;
   state.shipPitch += 120 * dt; // tumble
 
-  if (state.shipY >= PLAY_AREA_HEIGHT - 36) {
-    state.shipY = PLAY_AREA_HEIGHT - 36;
+  if (state.shipY >= PLAY_AREA_HEIGHT - SHIP_HEIGHT) {
+    state.shipY = PLAY_AREA_HEIGHT - SHIP_HEIGHT;
     state.phase = 'dead';
   }
 

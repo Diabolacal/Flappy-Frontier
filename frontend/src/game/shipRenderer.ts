@@ -19,7 +19,12 @@ export function renderShip(
     renderThruster(ctx, state.thrusterIntensity);
   }
 
-  // Hull
+  // Hull glow for visibility against dark background
+  ctx.save();
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = 'rgba(180, 190, 200, 0.4)';
+
+  // Hull — raster sprite from frontier-ship.png
   if (assets.shipBitmap) {
     ctx.drawImage(
       assets.shipBitmap,
@@ -28,9 +33,23 @@ export function renderShip(
       SHIP_WIDTH,
       SHIP_HEIGHT,
     );
+    // Second pass without shadow for crispness
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.globalAlpha = 0.15;
+    ctx.drawImage(
+      assets.shipBitmap,
+      -SHIP_WIDTH / 2,
+      -SHIP_HEIGHT / 2,
+      SHIP_WIDTH,
+      SHIP_HEIGHT,
+    );
+    ctx.globalAlpha = 1.0;
   } else {
     renderPlaceholderShip(ctx);
   }
+
+  ctx.restore();
 
   // Attitude jet (below hull, on flap)
   if (state.attitudeJetAge < 1) {
@@ -44,36 +63,63 @@ function renderPlaceholderShip(ctx: CanvasRenderingContext2D): void {
   const hw = SHIP_WIDTH / 2;
   const hh = SHIP_HEIGHT / 2;
 
-  // Hull body
-  ctx.fillStyle = '#4A4E54';
+  // Main hull body — elongated Frontier capital ship silhouette
+  ctx.fillStyle = '#8A8B80';
   ctx.beginPath();
-  ctx.moveTo(hw, 0);
-  ctx.lineTo(hw * 0.3, -hh);
-  ctx.lineTo(-hw, -hh * 0.7);
-  ctx.lineTo(-hw, hh * 0.7);
-  ctx.lineTo(hw * 0.3, hh);
+  ctx.moveTo(-hw, -hh * 0.15);           // stern top
+  ctx.lineTo(-hw * 0.7, -hh * 0.5);      // aft deck
+  ctx.lineTo(-hw * 0.3, -hh * 0.65);     // superstructure base left
+  ctx.lineTo(-hw * 0.3, -hh * 0.9);      // superstructure left wall
+  ctx.lineTo(0, -hh);                     // superstructure peak
+  ctx.lineTo(hw * 0.2, -hh * 0.8);       // superstructure right slope
+  ctx.lineTo(hw * 0.2, -hh * 0.6);       // superstructure base right
+  ctx.lineTo(hw * 0.6, -hh * 0.35);      // forward hull
+  ctx.lineTo(hw, 0);                      // bow tip
+  ctx.lineTo(hw * 0.6, hh * 0.55);       // forward lower hull
+  ctx.lineTo(hw * 0.2, hh * 0.8);        // mid belly
+  ctx.lineTo(-hw * 0.3, hh * 0.9);       // aft belly
+  ctx.lineTo(-hw * 0.7, hh * 0.6);       // stern lower hull
+  ctx.lineTo(-hw, hh * 0.3);             // stern bottom
+  ctx.closePath();
+  ctx.fill();
+
+  // Upper hull highlight
+  ctx.fillStyle = '#A0A396';
+  ctx.beginPath();
+  ctx.moveTo(-hw * 0.7, -hh * 0.5);
+  ctx.lineTo(hw * 0.6, -hh * 0.35);
+  ctx.lineTo(hw * 0.6, -hh * 0.1);
+  ctx.lineTo(-hw * 0.7, -hh * 0.15);
   ctx.closePath();
   ctx.fill();
 
   // Panel lines
-  ctx.strokeStyle = '#3A3D42';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#6C6B66';
+  ctx.lineWidth = 0.5;
   ctx.beginPath();
-  ctx.moveTo(-hw * 0.3, -hh);
-  ctx.lineTo(-hw * 0.3, hh);
-  ctx.moveTo(hw * 0.1, -hh * 0.8);
-  ctx.lineTo(hw * 0.1, hh * 0.8);
+  // Vertical seams
+  ctx.moveTo(-hw * 0.3, -hh * 0.65);
+  ctx.lineTo(-hw * 0.3, hh * 0.9);
+  ctx.moveTo(hw * 0.2, -hh * 0.6);
+  ctx.lineTo(hw * 0.2, hh * 0.8);
+  // Horizontal spine
+  ctx.moveTo(-hw * 0.8, 0);
+  ctx.lineTo(hw * 0.9, 0);
   ctx.stroke();
 
-  // Cockpit window
-  ctx.fillStyle = '#2A4A6A';
+  // Turret mounts (2 visible at this size)
+  ctx.fillStyle = '#7C7B74';
   ctx.beginPath();
-  ctx.moveTo(hw * 0.7, -hh * 0.25);
-  ctx.lineTo(hw * 0.4, -hh * 0.35);
-  ctx.lineTo(hw * 0.4, hh * 0.1);
-  ctx.lineTo(hw * 0.7, 0);
-  ctx.closePath();
+  ctx.arc(-hw * 0.1, 0, 3, 0, Math.PI * 2);
   ctx.fill();
+  ctx.beginPath();
+  ctx.arc(hw * 0.35, 0, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Engine nozzles
+  ctx.fillStyle = '#3E3D3A';
+  ctx.fillRect(-hw - 2, -hh * 0.3, 4, 3);
+  ctx.fillRect(-hw - 2, hh * 0.05, 4, 3);
 }
 
 function renderThruster(ctx: CanvasRenderingContext2D, intensity: number): void {

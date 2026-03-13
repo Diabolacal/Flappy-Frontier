@@ -16,7 +16,7 @@ export function GameOverScreen({ score, bestScore, onRestart, onMenu }: GameOver
         <div className="text-gray-400 text-sm mb-1">Score</div>
         <div className="text-white text-4xl font-bold mb-4">{score}</div>
         <div className="text-gray-400 text-sm mb-1">Best</div>
-        <div className="text-emerald-400 text-2xl font-bold">{bestScore}</div>
+        <div className="text-orange-400 text-2xl font-bold">{bestScore}</div>
         {score >= bestScore && score > 0 && (
           <div className="text-yellow-400 text-xs mt-2">★ New Best!</div>
         )}
@@ -25,7 +25,7 @@ export function GameOverScreen({ score, bestScore, onRestart, onMenu }: GameOver
       <div className="flex flex-col gap-3 w-48">
         <button
           onClick={onRestart}
-          className="py-3 px-6 rounded-lg bg-emerald-600 hover:bg-emerald-500
+          className="py-3 px-6 rounded-lg bg-orange-600 hover:bg-orange-500
                      text-white font-bold transition-colors"
         >
           RESTART

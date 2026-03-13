@@ -63,14 +63,16 @@ export function GamePage() {
     loopRef.current = handle;
   }, []);
 
-  // Scale the fixed-size game viewport to fit within the browser window
+  // Scale the fixed-size game viewport to fit within the browser window.
+  // Allow controlled upscale on large displays (capped to avoid absurd zoom on 4K).
+  const MAX_UPSCALE = 1.5;
   const [scale, setScale] = useState(1);
 
   useEffect(() => {
     function updateScale() {
       const scaleX = window.innerWidth / CANVAS_WIDTH;
       const scaleY = window.innerHeight / CANVAS_HEIGHT;
-      setScale(Math.min(scaleX, scaleY, 1)); // never upscale beyond 1:1
+      setScale(Math.min(scaleX, scaleY, MAX_UPSCALE));
     }
     updateScale();
     window.addEventListener('resize', updateScale);
@@ -87,7 +89,7 @@ export function GamePage() {
           transform: `scale(${scale})`,
           transformOrigin: 'center center',
         }}
-        className="relative overflow-hidden shadow-2xl shadow-emerald-900/20"
+        className="relative overflow-hidden shadow-2xl shadow-orange-900/20"
       >
         {/* Canvas layer */}
         <GameCanvas

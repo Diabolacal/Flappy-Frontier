@@ -5,7 +5,6 @@ import {
   PLAY_AREA_HEIGHT,
   GROUND_HEIGHT,
   PIPE_WIDTH,
-  PIPE_GAP,
   PIPE_CAP_HEIGHT,
   PIPE_CAP_EXTRA_WIDTH,
   COLORS,
@@ -41,11 +40,16 @@ function renderPipes(
   assets: GameAssets,
 ): void {
   for (const pipe of state.pipes) {
-    const halfGap = PIPE_GAP / 2;
+    const halfGap = pipe.gapSize / 2;
     const topHeight = pipe.gapCenterY - halfGap;
     const bottomY = pipe.gapCenterY + halfGap;
     const bottomHeight = PLAY_AREA_HEIGHT - bottomY;
     const x = Math.round(pipe.x);
+
+    // Subtle glow for pipe visibility
+    ctx.save();
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = 'rgba(200, 50, 50, 0.35)';
 
     if (assets.pipeBitmap) {
       // Draw clipped pipe bitmaps
@@ -94,6 +98,8 @@ function renderPipes(
       ctx.fillRect(capX, topHeight - PIPE_CAP_HEIGHT, capW, 2);
       ctx.fillRect(capX, bottomY, capW, 2);
     }
+
+    ctx.restore();
   }
 }
 
@@ -128,7 +134,7 @@ function renderGround(
     }
 
     // Top edge highlight
-    ctx.fillStyle = '#3A3D42';
+    ctx.fillStyle = '#6A6E75';
     ctx.fillRect(0, y, CANVAS_WIDTH, 2);
   }
 }

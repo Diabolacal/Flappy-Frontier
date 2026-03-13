@@ -5,6 +5,7 @@ export interface RNG {
 export interface PipeConfig {
   x: number;
   gapCenterY: number;
+  gapSize: number;
   scored: boolean;
 }
 

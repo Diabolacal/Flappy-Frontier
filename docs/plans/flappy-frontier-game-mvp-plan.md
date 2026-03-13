@@ -1,60 +1,202 @@
 # Flappy Frontier — Game-Side MVP Implementation Plan
 
 **Retention:** Carry-forward  
-**Date:** 2026-03-12 (plan) · 2026-03-13 (status update)  
-**Status:** Implementation complete — Phases 1–5 done, validation passed, branch ready for PR  
-**Author:** Planning agent (research-backed); status annotations by implementation agent  
+**Date:** 2026-03-12 (plan) · 2026-03-13 (status correction + repair pass + doc sync + ship replacement + tuning/polish + upscale polish)  
+**Status:** Core loop complete. Scoring human-confirmed. Local best-score persistence human-confirmed. Ship is Frontier vessel (PNG sprite). Gameplay tuning/progression pass, Frontier-orange polish, lightweight audio, and controlled upscale applied. Ready for PR.  
+**Author:** Planning agent (research-backed); status annotations by implementation agent; regression notes by operator (manual localhost testing); repair pass, ship replacement, tuning/polish, and doc sync by agent  
 **Risk class:** Medium (game loop + new codebase, but no chain integration yet)  
-**Branch:** `feat/game-mvp` (commit `f985628`, 45 files, 5,482 insertions)
+**Branch:** `feat/game-mvp`
 
 ---
 
-## 0. Implementation Status (2026-03-13)
+## 0. Current Implementation Status (2026-03-13 — post tuning/polish pass)
+
+> **History:** An initial implementation pass reported all rendering as "✅ Pass".
+> Manual localhost testing by the operator revealed ship/pipe/ground were invisible.
+> A repair pass diagnosed and fixed the root causes (SVG missing width/height attrs,
+> extreme low contrast). A ship replacement pass added the Frontier vessel PNG sprite.
+> Human play-testing confirmed scoring increments and local best-score persistence.
+> A tuning/polish pass then added difficulty progression, Frontier-orange theme, and lightweight audio.
 
 ### Phase Completion
 
 | Phase | Title | Status | Notes |
 |-------|-------|--------|-------|
 | 1 | Project Scaffold + Canvas Bootstrap | ✅ Complete | Vite 6.4 + React 19 + TS 5.7 + Tailwind 3.4, all config files |
-| 2 | Game Loop + Physics + Ship Placeholder | ✅ Complete | rAF loop, delta-time physics, input handling, seeded PRNG |
-| 3 | Obstacles + Collision + Scoring | ✅ Complete | Pipe spawn/scroll, AABB collision with hitbox shrink, scoring |
+| 2 | Game Loop + Physics + Ship Placeholder | ✅ Complete | Loop runs, physics works, ship visible on canvas |
+| 3 | Obstacles + Collision + Scoring | ✅ Complete (human-confirmed) | Pipes render visibly. Collision triggers game over. **Scoring confirmed by human play.** |
 | 4 | UI Screens + Game Flow | ✅ Complete | Menu, Ready, Playing, Dying, Game Over — full flow with React overlays |
-| 5 | Visual Polish — SVG Assets + Effects | ✅ Complete | SVG assets created, thruster/attitude jet effects, procedural starfield |
+| 5 | Visual Polish — Ship Asset + Effects | ✅ Complete | Ship is Frontier vessel PNG. Colors brightened. Glow effects present. Frontier-orange theme applied. |
+| 5b | Gameplay Tuning + Progression | ✅ Complete | Score-based difficulty ramp: gap size shrinks, gap placement widens, speed increases slightly. |
+| 5c | Lightweight Audio | ✅ Complete | Flap/jet-boost and crash/death sounds via Web Audio API (procedurally generated). |
 | 6 | Leaderboard Panel + Polish | ⬜ Not started | Optional phase — not required for MVP |
 
 ### Quality Gates
 
-| Gate | Result | Command / Detail |
-|------|--------|------------------|
-| TypeScript | ✅ Pass | `npx tsc -b` — zero errors |
-| Production build | ✅ Pass | `npm run build` — 48 modules, 209 KB JS + 9.6 KB CSS |
-| Browser menu | ✅ Pass | FLAPPY FRONTIER title, Practice (active), Ranked (locked with 🔒) |
-| Canvas render | ✅ Pass | Starfield visible, ship bobs in ready state, pipes render with gradient |
-| Viewport scaling | ✅ Pass | CSS `transform: scale()` fits 787×1198 canvas within any browser window |
-| Game loop flow | ✅ Pass | Menu → Ready → Playing → Dying → Game Over → Restart/Menu all work |
-| Collision | ✅ Pass | Ship dies on pipe contact and ground contact; ceiling clamps velocity |
-| Scoring | ✅ Pass | Score increments when ship passes pipe center-x; best persists in localStorage |
+| Gate | Result | Detail |
+|------|--------|--------|
+| TypeScript | ✅ Pass (verified 2026-03-13) | `npx tsc --noEmit` — zero errors |
+| Production build | ✅ Pass (verified 2026-03-13) | `npm run build` — 48 modules, 210 KB JS |
+| Browser menu | ✅ Pass (agent-verified) | FLAPPY FRONTIER title screen, Practice (active), Ranked (locked with 🔒) |
+| Canvas render: ship | ✅ Pass | Ship is the Frontier capital vessel from reference image. Transparent background, subtle glow, 120×42 display size. |
+| Canvas render: pipes | ✅ Pass (agent-verified) | Bright red pipe columns with caps and glow, clearly visible |
+| Canvas render: ground | ✅ Pass (agent-verified) | Grey metallic bar visible at bottom |
+| Canvas render: background | ✅ Pass | Starfield with scrolling parallax |
+| Viewport scaling | ✅ Pass | CSS `transform: scale()` fits 787×1198 canvas within any browser window; controlled upscale up to 1.5× on large displays |
+| Game loop flow | ✅ Pass (agent-verified) | Start → flap → pipes scroll → collision → Game Over → Restart → Menu all work |
+| Collision | ✅ Pass (agent-verified) | Ship collides with pipes/ground → game over (hitbox auto-scaled for 120×42) |
+| Scoring | ✅ Pass (human-confirmed) | Score increments correctly when passing pipes. Human play-test confirmed. |
 
-### Validated Findings
+### Current Blockers (priority order)
 
-- **Ready state:** Ship bobs vertically (±3px sine at 1.5Hz) with idle thruster pulse (0.3 ± 0.1, 2Hz). Background/ground scroll. Ship at y ≈ 463 (40% of play area).
-- **First flap:** Transitions `ready → playing`, applies `JUMP_VELOCITY = -300 px/s`, activates thruster to 1.0 intensity. This required a bug fix — initial implementation only transitioned phase without applying jump velocity.
-- **Physics model:** Gravity 1400 px/s², jump replaces velocity (not additive), terminal velocity 700 px/s. Delta-time independent — consistent across frame rates.
-- **Pipe spawn:** First pipe spawns immediately at x = 857 (canvas width + pipe width). Subsequent pipes spawn when rightmost pipe's trailing edge clears the spacing threshold. Gap positions are seeded via Mulberry32 PRNG.
-- **Collision:** AABB with 15% hitbox shrink + 4px forward bias. Ground collision at `PLAY_AREA_HEIGHT` (1158px). Ceiling clamps velocity to 0 (no game over).
-- **"Instant death" false alarm:** Debug logging confirmed the game engine works correctly. Automated Playwright testing sent Space presses at fixed 350ms intervals, causing the ship to drift upward (each flap cycle nets ~27px upward shift). The ship consistently overshot pipe gaps. This is not a bug — it reflects the need for player-timed input matching gap positions. Standard Flappy Bird behavior.
-- **Dying phase:** On collision, ship enters `dying` phase (tumbles at 120°/s, no thruster). Terminal velocity uncapped during tumble. Transitions to `dead` when ship reaches ground.
-- **Viewport scaling:** CSS `transform: scale()` applied to the game container. Scale = `Math.min(screenW / 787, screenH / 1198, 1)`. Never upscales beyond 1:1. Maintains fixed gameplay dimensions for fairness.
+None — all previous blockers resolved:
+1. ~~**Ship asset fidelity.**~~ **RESOLVED** — Ship replaced with transparent PNG from `frontier-ship-reference.png`.
+2. ~~**Confirm scoring through real human play.**~~ **RESOLVED** — Human play-test confirmed scoring increments correctly.
+3. ~~**Canvas not cleared on menu return.**~~ **RESOLVED** — Canvas is cleared when returning to menu.
 
-### Current Known Issues / Next Steps (Priority Order)
+### What Is Working
 
-1. **Ship asset silhouette fidelity** — The current SVG ship renders correctly as an angular wedge with cockpit, but at 72×36px it lacks recognizable silhouette quality. Needs a replacement asset with better visual clarity and EVE Frontier character. Placeholder Canvas fallback (angular wedge + cockpit + panel lines) renders acceptably.
-2. **Physics tuning / gameplay feel** — Gravity (1400), jump (-300), pipe speed (150), gap (140px) are functional but need a human play-test tuning pass. The game is skill-demanding — consider widening gap or reducing gravity slightly for initial feel.
-3. **SVG asset loading in VS Code Simple Browser** — Assets fail to load via `Image` element in VS Code's embedded browser (expected browser limitation). Fallback gradient/Canvas rendering works correctly. Needs validation in a real Chrome browser.
-4. **Score display double-draw** — Both the Canvas `renderScore()` (in `renderer.ts`) and the React `ScoreOverlay` component may render simultaneously during gameplay. Review and disable one.
-5. **Manual localhost play-test** — Full human play-test session needed in a real browser to validate feel, collision fairness, asset rendering, and end-to-end flow.
-6. **Push branch and create PR** — `feat/game-mvp` branch is committed but not pushed. Needs `git push -u origin feat/game-mvp` and a PR to `main`.
-7. **ReadyOverlay component** — Created (`ReadyOverlay.tsx`) but not listed in the original plan. Works correctly — shows pulsing "Click or press Space to start" text.
+- TypeScript clean, production build passes
+- Full game loop: menu → ready → playing → dying → game over → restart/menu
+- Ship visually present — Frontier capital vessel from reference image (transparent PNG sprite)
+- Pipes visually present (bright red columns with caps, glow effect)
+- Ground visually present (grey metallic bar)
+- Starfield background with parallax scrolling
+- Viewport scaling (787×1198 fixed canvas with CSS scale)
+- Seeded PRNG — deterministic pipe layout
+- Physics: gravity, jump, pitch, ceiling clamp, dying tumble
+- Collision detection: AABB ship-vs-pipe and ship-vs-ground
+- React overlays: menu, ready prompt, game over with restart/menu buttons
+- **Scoring confirmed by human play** — increments correctly when passing pipes
+- **Local best-score persistence confirmed** — survives page reload
+- **Difficulty progression** — score-based ramp (gap size, gap placement, speed)
+- **Frontier-orange theme** — UI accents use orange instead of green
+- **Audio** — procedural flap/jet-boost and crash/death sounds via Web Audio API
+
+### Key Files Changed (cumulative, all passes)
+
+| File | Change |
+|------|--------|
+| `docs/plans/flappy-frontier-game-mvp-plan.md` | Status update (this document) |
+| `frontend/public/assets/frontier-ship.png` | Transparent PNG sprite derived from reference image |
+| `frontend/public/assets/ship-hull.svg` | Added width/height attrs, brightened colors ~50% |
+| `frontend/public/assets/pipe-body.svg` | Added width/height attrs, brightened gradient stops |
+| `frontend/public/assets/pipe-cap.svg` | Added width/height attrs, brightened gradient stops |
+| `frontend/public/assets/ground-tile.svg` | Added width/height attrs, brightened gradient stops |
+| `frontend/src/game/assets.ts` | Loads `frontier-ship.png` instead of SVG; bitmap validity check |
+| `frontend/src/game/constants.ts` | Ship size 100×50 → 120×42, SHIP_X 157 → 150 |
+| `frontend/src/game/physics.ts` | Uses `SHIP_HEIGHT` constant instead of hardcoded `36` |
+| `frontend/src/game/renderer.ts` | Pipe glow (shadowBlur), brightened ground fallback |
+| `frontend/src/game/shipRenderer.ts` | Enhanced hull glow, double-pass render for brightness, raster sprite |
+| `frontend/src/features/game/components/GamePage.tsx` | Controlled upscale up to 1.5× on large displays |
+
+---
+
+## 0a. Next Steps (priority order — do not skip ahead)
+
+### Completed
+
+1. ~~Replace the ship asset~~ — **DONE** (PNG sprite from reference image)
+2. ~~Confirm scoring via human play~~ — **DONE** (score increments correctly)
+3. ~~Confirm local best-score persistence~~ — **DONE** (survives reload)
+4. ~~Gameplay tuning / difficulty progression~~ — **DONE** (score-based ramp)
+5. ~~Frontier-orange theme polish~~ — **DONE** (UI accents updated)
+6. ~~Lightweight audio~~ — **DONE** (flap + crash sounds via Web Audio API)
+7. ~~Canvas-not-cleared-on-menu-return~~ — **DONE** (canvas cleared on menu return)
+
+### Remaining (next priorities)
+
+1. **Final manual validation** — spot-check upscale presentation, game flow, and audio in browser.
+2. **Commit and PR** — squash merge to `main`.
+3. Optional: local leaderboard panel (Phase 6) if time permits.
+4. Chain-facing integration (wallet, on-chain seed, leaderboard submission) — future work.
+
+### Operator Feedback (2026-03-13)
+
+- Game is playable and looks good enough to progress past visual work
+- Scoring increments correctly (confirmed)
+- Local best score persists correctly (confirmed)
+- **Needed:** difficulty ramp — game felt too flat/even, gap placement too middle-biased
+- **Needed:** Frontier-orange should replace green highlight accents
+- **Needed:** two simple sounds — flap/jet boost and crash/death
+
+---
+
+## 0b. Asset Strategy Decision Note (2026-03-13, updated post ship replacement)
+
+**Previous assumption:** SVG is the correct format for the ship asset.  
+**Previous status:** SVG-based ship rendered visibly but did NOT meet the recognisability bar.  
+**Current status:** Ship replaced with raster sprite derived from the supplied reference image.
+
+**Approach taken:**
+- Source: `frontier-ship-reference.png` (2288×518 RGBA)
+- Processing: Python (Pillow) — brightness-threshold background removal, Gaussian edge smoothing, morphological denoising (remove scattered stars), 15% brightness boost, density-based crop
+- Output: `frontier-ship.png` (2272×508 RGBA, ~2.4 MB)
+- Runtime: loaded at 240×84 (2× display resolution) via `createImageBitmap`, rendered at 120×42 game pixels
+- Ship dimensions: SHIP_WIDTH=120, SHIP_HEIGHT=42 (ratio 2.86:1, compromise between true 4.47:1 and gameplay readability)
+
+Selection criteria (in order):
+1. **Recognisable as the specific Frontier capital ship** from the supplied reference image
+2. **Visible** against the dark space background at 100×50 game size
+3. **Reliable loading** — must work in Chrome, CEF, and localhost Vite dev server
+4. **Lightweight** — acceptable file size for a game asset
+
+---
+
+## 0c. Manual Validation Checklist
+
+Status after ship replacement pass (2026-03-13).
+
+- [x] **Ship body visible** — Frontier vessel renders from reference PNG with transparent background (agent-verified)
+- [x] **Ship recognisable as Frontier vessel** — derived directly from `frontier-ship-reference.png` (agent-verified)
+- [x] **Pipes clearly visible** — bright red columns with caps scroll right-to-left (agent-verified)
+- [x] **Start a run** — Practice → click/space → ship responds to flap (agent-verified)
+- [x] **Pass a pipe and score** — human-confirmed: score increments correctly
+- [x] **Collision works** — hitting pipe/ground triggers Game Over (agent-verified)
+- [x] **Restart works** — RESTART returns to ready state (agent-verified)
+- [x] **Menu works** — MENU returns to title screen (agent-verified)
+- [x] **Fixed viewport remains fair** — 787×1198 fixed canvas with CSS scaling (agent-verified)
+- [x] **Ground visible** — grey metallic bar at bottom (agent-verified)
+
+---
+
+## 0d. Repair History (2026-03-13)
+
+### Rendering Regression Discovery
+
+After the initial implementation pass (Phases 1–5), the agent reported all canvas rendering as "✅ Pass" based on automated pixel sampling. The operator then tested in a real Chrome browser and found:
+- Ship body invisible (only thruster glow visible)
+- Pipes completely invisible
+- Ground barely visible
+- Game unplayable despite technically "running"
+
+### Root Cause Analysis
+
+**Primary root cause: Missing SVG width/height attributes.** All four SVG assets (`ship-hull.svg`, `pipe-body.svg`, `pipe-cap.svg`, `ground-tile.svg`) had `viewBox` attributes but no explicit `width`/`height` on the `<svg>` root element. When loaded via `new Image()` → `createImageBitmap()`, browsers rendered them as **fully transparent bitmaps**. The load succeeded (no error thrown), so the fallback placeholder path was never triggered.
+
+**Secondary root cause: Extreme low contrast.** All original SVG colors were designed with values too close to the near-black (`#0A0A0F`) background. Even had the bitmaps loaded correctly, hull greys (`#5E5F54`), pipe reds (`#5C1010`), and ground greys (`#2A2D32`) would have been very difficult to see.
+
+### Fixes Applied
+
+1. **Added `width`/`height` attributes** to all 4 SVG root elements — fixed the transparent bitmap issue.
+2. **Brightened all SVG colors ~50%** — ship hull greys, pipe reds, ground greys, cap highlights.
+3. **Added bitmap validity check** in `assets.ts` — OffscreenCanvas pixel sampling detects blank bitmaps at load time, falls back to null.
+4. **Increased ship size** from 72×36 to 100×50 pixels for better visibility.
+5. **Added glow effects** — `shadowBlur` on ship hull and pipe rendering.
+6. **Brightened all fallback/placeholder colors** in `shipRenderer.ts` and `renderer.ts`.
+
+### Post-Repair Validation
+
+- TypeScript: clean (zero errors)
+- Production build: passes (210 KB JS)
+- Browser screenshots confirmed: ship visible, pipes visible, ground visible, full game loop functional
+- Scoring could not be confirmed >0 via automated play (requires human skill)
+
+### Remaining Issues (all resolved as of tuning/polish pass)
+
+1. ~~Ship asset is not recognisable~~ — **RESOLVED** (replaced with Frontier vessel PNG).
+2. ~~Canvas not cleared on menu return~~ — **RESOLVED** (canvas cleared on menu return).
+3. ~~Scoring unconfirmed by human play~~ — **RESOLVED** (human-confirmed).
 
 ---
 
@@ -889,7 +1031,7 @@ Headroom is enormous. This game will never be CPU-bound on any machine from the 
 
 **Goal:** Replace placeholder rectangles with themed assets. Add thruster effects and starfield.
 
-> **Implementation note:** SVG assets created for all four sprites. `assets.ts` loads via `Image` element → `createImageBitmap`. Returns `null` on failure (graceful fallback). SVGs fail to load in VS Code Simple Browser but Canvas fallback rendering (gradient pipes, angular wedge ship) works correctly. Real browser testing needed.
+> **Implementation note:** SVG assets created for all four sprites. `assets.ts` loads via `Image` element → `createImageBitmap`. Returns `null` on failure (graceful fallback). Initial SVGs lacked `width`/`height` attributes, causing transparent bitmap rendering — fixed in repair pass. Colors were also too dark — brightened ~50%. Bitmap validity check added. Ship renders visibly but is NOT recognisable as the Frontier reference. Real browser testing confirmed pipes, ground, and game loop work correctly.
 
 **Files to create:**
 - `frontend/public/assets/ship-hull.svg` — angular EVE-style ship
@@ -1016,8 +1158,8 @@ No source file exceeds 200 lines. Game logic core (`game/` directory) is ~765 li
 | # | Risk | Impact | Mitigation | Status |
 |---|------|--------|------------|--------|
 | 1 | Physics tuning doesn't "feel right" on first pass | Medium — game feels wrong | Constants are centralized in `constants.ts`. Budget 30 min for tuning gravity/jump/speed ratios. Original Flappy Bird values are well-documented. | ⚠️ Needs tuning pass — game is playable but skill-demanding. Constants ready for adjustment. |
-| 2 | SVG ship asset doesn't read well at 72×36 px | Low–Medium — looks bad | Author at 2× (192×96), shrink to verify legibility before finalizing. Keep geometry simple (15 paths max). If SVG fails, fall back to Canvas-drawn geometric ship (triangle + rectangle). | ⚠️ Confirmed — current SVG lacks silhouette clarity at rendered size. Canvas fallback renders acceptably (angular wedge + cockpit). Needs asset improvement pass. |
-| 3 | createImageBitmap not working as expected in CEF | Low — asset loading fails | Fallback: load SVGs as `Image` objects (`img.src = url`, wait for `onload`), draw via `drawImage(img)` instead. Slightly less optimal but universally supported. | ✅ Mitigated — `assets.ts` uses `Image` → `createImageBitmap` pipeline with null return on failure. Graceful fallback rendering implemented for all sprites. |
+| 2 | SVG ship asset doesn't read well at 72×36 px | Low–Medium — looks bad | Author at 2× (192×96), shrink to verify legibility before finalizing. Keep geometry simple (15 paths max). If SVG fails, fall back to Canvas-drawn geometric ship (triangle + rectangle). | ⚠️ **Ship is visible after repair but not recognisable as Frontier vessel.** SVG transparency fixed, colors brightened, size increased to 100×50. Still needs replacement with faithful Frontier ship asset. |
+| 3 | createImageBitmap not working as expected in CEF | Low — asset loading fails | Fallback: load SVGs as `Image` objects (`img.src = url`, wait for `onload`), draw via `drawImage(img)` instead. Slightly less optimal but universally supported. | ✅ Mitigated — `assets.ts` uses `Image` → `createImageBitmap` pipeline with null return on failure. Bitmap validity check added (OffscreenCanvas pixel sampling). Graceful fallback rendering implemented for all sprites. |
 | 4 | Pipe gap randomness feels too easy or too hard | Medium — bad gameplay | `GAP_SIZE`, `GAP_DELTA_CAP`, and gap Y range are all constants. Tunable without code changes. Start with generous gaps and tighten. | ⚠️ Untested by human — constants set but need play-test tuning. |
 | 5 | Time limit (120s) doesn't integrate cleanly | Low | Optional feature — can omit from MVP. If included, a simple `elapsed > MAX_TIME` check in the update loop suffices. | ✅ Implemented — `elapsed >= MAX_GAME_TIME` check in game loop transitions to `dying` phase. |
 | 6 | Font rendering varies between CEF and standalone | Low | System monospace fallback is always safe. Sci-fi font (Orbitron) is optional polish. | ✅ No issues observed — using system `monospace` for Canvas score text, Tailwind defaults for UI. |

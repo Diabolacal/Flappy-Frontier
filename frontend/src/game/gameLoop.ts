@@ -5,7 +5,6 @@ import {
   SHIP_START_Y,
   DT_CAP,
   BG_SCROLL_SPEED,
-  GROUND_SCROLL_SPEED,
   JUMP_VELOCITY,
   MAX_GAME_TIME,
   THRUSTER_PULSE_HZ,
@@ -19,6 +18,8 @@ import { render, renderScore } from './renderer';
 import { initStarfield } from './starfield';
 import { loadAssets } from './assets';
 import { createInputHandler } from './input';
+import { getDifficulty } from './progression';
+import { playFlap, playCrash, ensureAudioResumed } from './audio';
 
 function createInitialState(mode: GameMode, bestScore: number): GameState {
   const { seed } = getLocalSeed();
@@ -94,8 +95,9 @@ export function startGameLoop(
   function update(dt: number): void {
     // Background/ground always scroll in ready and playing
     if (state.phase === 'ready' || state.phase === 'playing') {
+      const diff = getDifficulty(state.score);
       state.backgroundScroll += BG_SCROLL_SPEED * dt;
-      state.groundScroll += GROUND_SCROLL_SPEED * dt;
+      state.groundScroll += diff.pipeSpeed * dt;
     }
 
     if (state.phase === 'ready') {
@@ -109,6 +111,8 @@ export function startGameLoop(
       // First flap transitions to playing AND performs the first jump
       if (inputState.pendingFlap) {
         inputState.pendingFlap = false;
+        ensureAudioResumed();
+        playFlap();
         state.phase = 'playing';
         state.shipY = SHIP_START_Y;
         state.shipVelocity = JUMP_VELOCITY;
@@ -124,6 +128,8 @@ export function startGameLoop(
       const flap = inputState.pendingFlap;
       inputState.pendingFlap = false;
 
+      if (flap) playFlap();
+
       updatePhysics(state, dt, flap);
       updateObstacles(state, dt);
 
@@ -134,6 +140,7 @@ export function startGameLoop(
       if (checkCollision(state)) {
         state.phase = 'dying';
         state.thrusterIntensity = 0;
+        playCrash();
         callbacks.onPhaseChange('dying');
       }
 

@@ -10,10 +10,10 @@ export function ModeSelector({ onSelectMode }: ModeSelectorProps) {
     <div className="flex gap-4 w-full max-w-sm">
       <button
         onClick={() => onSelectMode('practice')}
-        className="flex-1 py-4 px-3 rounded-lg border-2 border-emerald-500/50 bg-emerald-950/40
-                   hover:bg-emerald-900/50 hover:border-emerald-400 transition-colors text-left"
+        className="flex-1 py-4 px-3 rounded-lg border-2 border-orange-500/50 bg-orange-950/40
+                   hover:bg-orange-900/50 hover:border-orange-400 transition-colors text-left"
       >
-        <div className="text-emerald-400 font-bold text-lg">{GAME_MODES.practice.label}</div>
+        <div className="text-orange-400 font-bold text-lg">{GAME_MODES.practice.label}</div>
         <div className="text-gray-400 text-sm mt-1">{GAME_MODES.practice.description}</div>
       </button>
       <button

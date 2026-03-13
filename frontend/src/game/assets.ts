@@ -1,15 +1,12 @@
 import type { GameAssets } from './types';
 
-async function loadSVGToBitmap(
+async function loadImageToBitmap(
   url: string,
   width: number,
   height: number,
 ): Promise<ImageBitmap | null> {
   try {
-    // Use Image element for broader compatibility
     const img = new Image();
-    img.width = width;
-    img.height = height;
 
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
@@ -17,10 +14,32 @@ async function loadSVGToBitmap(
       img.src = url;
     });
 
-    return await createImageBitmap(img, {
+    const bitmap = await createImageBitmap(img, {
       resizeWidth: width,
       resizeHeight: height,
+      resizeQuality: 'high',
     });
+
+    // Verify the bitmap has visible content
+    const testCanvas = new OffscreenCanvas(width, height);
+    const testCtx = testCanvas.getContext('2d');
+    if (testCtx) {
+      testCtx.drawImage(bitmap, 0, 0);
+      const sample = testCtx.getImageData(
+        Math.floor(width / 4), Math.floor(height / 4),
+        Math.floor(width / 2), Math.floor(height / 2),
+      );
+      let hasContent = false;
+      for (let i = 3; i < sample.data.length; i += 4) {
+        if (sample.data[i]! > 10) { hasContent = true; break; }
+      }
+      if (!hasContent) {
+        console.warn(`Asset bitmap is blank: ${url}, using fallback`);
+        return null;
+      }
+    }
+
+    return bitmap;
   } catch {
     console.warn(`Failed to load asset: ${url}, using fallback`);
     return null;
@@ -29,10 +48,10 @@ async function loadSVGToBitmap(
 
 export async function loadAssets(): Promise<GameAssets> {
   const [shipBitmap, pipeBitmap, pipeCapBitmap, groundBitmap] = await Promise.all([
-    loadSVGToBitmap('/assets/ship-hull.svg', 72, 36),
-    loadSVGToBitmap('/assets/pipe-body.svg', 70, 600),
-    loadSVGToBitmap('/assets/pipe-cap.svg', 78, 20),
-    loadSVGToBitmap('/assets/ground-tile.svg', 128, 40),
+    loadImageToBitmap('/assets/frontier-ship.png', 240, 84),
+    loadImageToBitmap('/assets/pipe-body.svg', 70, 600),
+    loadImageToBitmap('/assets/pipe-cap.svg', 78, 20),
+    loadImageToBitmap('/assets/ground-tile.svg', 128, 40),
   ]);
 
   return { shipBitmap, pipeBitmap, pipeCapBitmap, groundBitmap };

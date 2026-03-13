@@ -4,7 +4,6 @@ import {
   SHIP_WIDTH,
   SHIP_HEIGHT,
   PIPE_WIDTH,
-  PIPE_GAP,
   PLAY_AREA_HEIGHT,
   HITBOX_SHRINK,
 } from './constants';
@@ -37,7 +36,7 @@ export function checkCollision(state: GameState): boolean {
 
   // Pipe collision
   for (const pipe of state.pipes) {
-    const halfGap = PIPE_GAP / 2;
+    const halfGap = pipe.gapSize / 2;
     const topPipe: Rect = {
       x: pipe.x,
       y: 0,
