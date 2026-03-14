@@ -53,6 +53,9 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:5173',
 ];
 
+/** Wildcard suffix patterns — origins ending with these are allowed */
+const ALLOWED_ORIGIN_SUFFIXES = ['.flappy-frontier.pages.dev'];
+
 // ── Helpers ────────────────────────────────────────────────────────
 
 function getAllowedOrigins(env: Env): string[] {
@@ -62,9 +65,23 @@ function getAllowedOrigins(env: Env): string[] {
   return DEFAULT_ALLOWED_ORIGINS;
 }
 
-function corsHeaders(origin: string | null, env: Env): Record<string, string> {
+/** Check if an origin is allowed (exact match OR wildcard suffix match) */
+function isOriginAllowed(origin: string, env: Env): boolean {
   const allowed = getAllowedOrigins(env);
-  const matched = origin && allowed.includes(origin) ? origin : '';
+  if (allowed.includes(origin)) return true;
+
+  // Wildcard: allow any *.flappy-frontier.pages.dev subdomain (preview deploys)
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== 'https:') return false;
+    return ALLOWED_ORIGIN_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
+  } catch {
+    return false;
+  }
+}
+
+function corsHeaders(origin: string | null, env: Env): Record<string, string> {
+  const matched = origin && isOriginAllowed(origin, env) ? origin : '';
   return {
     'Access-Control-Allow-Origin': matched,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',

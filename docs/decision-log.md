@@ -5,6 +5,44 @@
 Newest entries first. See `docs/operations/DECISIONS_TEMPLATE.md` for format.
 
 ---
+## 2026-03-14 — Fix weekly countdown to target Sunday 00:00 UTC
+
+- **Goal:** Countdown was showing ~7 days (anchor + duration) instead of targeting the next Sunday 00:00 UTC (~20h away). Label showed misleading "Week #2".
+- **Root cause — countdown:** `epochTimeState` computed `epoch_start_ms + epoch_duration_ms` (rolling window, no calendar alignment). epoch_start was set to Clock.timestamp_ms() at init_treasury time (arbitrary, not a Sunday).
+- **Root cause — label:** `current_epoch` from on-chain Treasury is just a payout counter, unrelated to calendar weeks.
+- **Fix — frontend:** Replaced `epochTimeState(epochStartMs, durationMs)` with `weekTimeState(epochStartMs)` that computes the first Sunday 00:00 UTC after the epoch anchor. Replaced "Week #N" with "This Week".
+- **Fix — on-chain:** Admin tx `68xPpJD3FTvfEoX86uZKZxmwQqRbpPGBBhBcPSmWCqzd` set `epoch_duration_ms` to 72,722,071 ms so the on-chain epoch also expires at Sunday March 15 00:00 UTC (matches the frontend).
+- **Files:** `frontend/src/features/score/components/LeaderboardPanel.tsx`
+- **Diff:** ~20 LoC changed (function rewrite + label)
+- **Risk:** Low (display logic + admin parameter, no contract schema change)
+- **Gates:** typecheck ✅ build ✅
+- **Follow-up:** After Sunday payout, admin must call `set_epoch_duration(604800000)` to restore 7-day duration for subsequent weeks.
+
+---
+## 2026-03-14 — Weekly epoch + player name resolution
+
+- **Goal:** Change competition window from 10-minute to weekly (Sunday 00:00 UTC), implement EVE Frontier character name resolution for leaderboard and player badge UI.
+- **Files:** `frontend/src/lib/contractConfig.ts`, `frontend/src/lib/playerNames.ts` (new), `frontend/src/features/auth/hooks/usePlayerName.ts` (new), `frontend/src/features/game/components/GamePage.tsx`, `frontend/src/features/game/components/StartScreen.tsx`, `frontend/src/features/score/components/LeaderboardPanel.tsx`
+- **Diff:** ~200 LoC added, ~20 LoC removed
+- **Risk:** Medium (new utility + hooks, UI wiring, no core game loop changes)
+- **Gates:** typecheck ✅ build ✅ smoke ⬜ (pending live validation)
+- **On-chain admin tx:** `9U9toi4i6XRZE7hsrCucCg1sLnJnbvaRnVBrkTyRtRM3` — set `epoch_duration_ms` to 604,800,000 (7 days)
+- **Follow-ups:** Verify player name display with real Stillness characters, remove temporary sponsor diagnostics from useGameTransaction.ts
+
+---
+## 2026-03-14 — Stillness contract publish + frontend retarget
+
+- **Goal:** Migrate Flappy Frontier from Utopia validation context to Stillness live-server context. Fresh publish of identical Move contracts, init_treasury with Stillness EVE type, retarget frontend config.
+- **Files:** `frontend/src/lib/contractConfig.ts`, `contracts/flappy_frontier/Published.toml`, `docs/plans/stillness-and-player-names-plan.md`, `docs/plans/flappy-frontier-chain-integration-plan.md`
+- **Diff:** ~20 LoC changed (config values only, no logic changes)
+- **Risk:** Medium (config retarget + contract redeploy, no code changes)
+- **Gates:** typecheck ✅ build ✅ move-build ✅ move-test ✅ (23/23) smoke ⬜ (pending live validation with Stillness EVE)
+- **New Stillness IDs:** Package `0x355b6228...9175e6`, AdminCap `0xc633e5f3...e77f7`, GameConfig `0x96127c4d...5c57`, Leaderboard `0xeeda7b21...784d`, Treasury `0xad7f4936...2813`, UpgradeCap `0x2dd8d599...aa5a`
+- **Publish tx:** `AoCPM4PTDzCnRGK1kAux9tQmg3mYgWobxpSpV73V4nNN`
+- **Init treasury tx:** `7kwvmWFxCS8Qy7mwJyWnYowTEuvw5cAxcUxBZc5pPJ75`
+- **Follow-ups:** Live Stillness validation (Step 4), player name resolution (Step 5), Cloudflare re-deploy with Stillness config
+
+---
 ## 2026-03-13 — Fix sponsor service SuiJsonRpcClient constructor
 
 - **Goal:** Fix silent sponsor failure — worker was constructing `SuiJsonRpcClient(urlString)` instead of `SuiJsonRpcClient({ url: urlString })`. This caused "Invalid URL: undefined" on every request, which the frontend silently caught and fell back to player-paid gas.

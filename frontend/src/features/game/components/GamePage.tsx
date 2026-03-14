@@ -8,6 +8,7 @@ import { buildStartRunTransaction, parseSeedFromEvents } from '@/lib/seedProvide
 import { buildSubmitScoreTransaction, submitScore } from '@/features/score/services/scoreService';
 import { usePlayerIdentity } from '@/features/auth/hooks/usePlayerIdentity';
 import { useGameTransaction } from '@/features/auth/hooks/useGameTransaction';
+import { usePlayerName } from '@/features/auth/hooks/usePlayerName';
 import type { SSUWalletInfo } from '@/features/auth/hooks/useSSUWallet';
 import { LeaderboardPanel } from '@/features/score/components/LeaderboardPanel';
 import { GameCanvas } from './GameCanvas';
@@ -28,6 +29,7 @@ interface GamePageProps {
 
 export function GamePage({ ssuWallet }: GamePageProps) {
   const { execute: executeTransaction, sponsorship, suiClient } = useGameTransaction();
+  const playerName = usePlayerName(usePlayerIdentity().player.address);
   const { player, canPlayRanked, disconnect } = usePlayerIdentity();
 
   const [screenState, setScreenState] = useState<ScreenState>('menu');
@@ -298,6 +300,7 @@ export function GamePage({ ssuWallet }: GamePageProps) {
             bestScore={displayBestScore}
             canPlayRanked={canPlayRanked}
             playerAddress={player.address}
+            playerDisplayName={playerName}
             entryFeeDisplay={ENTRY_FEE_DISPLAY}
             ssuWallet={ssuWallet}
             onStart={handleStart}

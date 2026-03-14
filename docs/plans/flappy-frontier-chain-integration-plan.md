@@ -5,7 +5,7 @@
 **Status:** Phase 4 complete — Cloudflare deployment live; sponsor service deployed as Cloudflare Worker (`flappy-frontier-sponsor`); dedicated sponsor wallet generated (Ed25519); frontend deployed to Cloudflare Pages (`flappy-frontier`); sponsor service URL baked into production build; CORS configured for Pages preview + production + localhost; sponsorship pending activation — operator must set `SPONSOR_PRIVATE_KEY` secret on the worker and fund the sponsor wallet with testnet SUI; all prior phases (contracts, frontend chain wiring, SSU wallet UX, sponsorship client) remain complete  
 **Author:** Planning agent  
 **Risk class:** High (Move contracts + treasury logic + wallet integration + deployment)  
-**Depends on:** Game-side MVP (complete), Sui testnet access, deployer wallet with SUI + EVE, EVE coin type ✅ confirmed on Utopia
+**Depends on:** Game-side MVP (complete), Sui testnet access, deployer wallet with SUI + EVE, EVE coin type ✅ confirmed on Stillness
 
 ---
 
@@ -144,7 +144,7 @@ The thinnest slice that satisfies the product vision and is manually verifiable:
 | Item | Blocker for | How to obtain | Fallback |
 |------|-------------|---------------|----------|
 | **EVE coin type for Utopia** | Treasury and entry-fee contract types | ✅ **Resolved:** `0xf0446b93345c1118f21239d7ac58fb82d005219b2016e100f074e4d17162a465::EVE::EVE` (9 decimals, same as SUI) | Resolved — no longer a blocker |
-| **EVE coin type for Stillness** (`<pkg>::EVE::EVE`) | Stillness deployment (post-validation) | Call `getEveCoinType('stillness')` from `@evefrontier/dapp-kit/utils` | Not needed until Stillness deployment |
+| **EVE coin type for Stillness** (`<pkg>::EVE::EVE`) | Stillness deployment | ✅ **Resolved:** `0x2a66a89b5a735738ffa4423ac024d23571326163f324f9051557617319e59d60::EVE::EVE` | Resolved — contracts published on Stillness |
 | **Deployer wallet** with testnet SUI | Publishing contracts, testing | `sui client active-address` + testnet faucet | Must have — no fallback |
 | **Deployer wallet with testnet EVE** | Testing ranked entry flow | ✅ Operator has a Utopia test wallet with EVE available for manual validation | Resolved — operator-funded validation wallet available |
 | **Cloudflare account + API token** | Deployment to Pages | Operator provides or uses local `.env.local` + `npx wrangler login` | localhost-only for initial validation |
@@ -586,7 +586,7 @@ These items are explicitly **not part of this phase** and should wait until the 
 | **Multiple difficulty levels / power-ups** | Out of scope per product vision | Post-hackathon |
 | **Production domain setup** | Preview URL is sufficient for hackathon | Before submission deadline if DNS is ready |
 | **Admin fund operations (withdraw, drain, pause)** | Treasury is non-custodial by design; `AdminCap` is scoped to parameter tuning (epoch duration, fee amount) only — no fund-movement capability | Not planned — this is a hard constraint, not a deferral |
-| **Stillness deployment** | Utopia is the test environment; Stillness is for production | After full Utopia validation, before hackathon submission if needed |
+| ~~**Stillness deployment**~~ | ✅ Complete — contracts published on Stillness testnet (2026-03-14). Package `0x355b62...9175e6`, Treasury `0xad7f49...ab2813`. Frontend retargeted. | N/A |
 
 ---
 
@@ -635,7 +635,19 @@ However, the Utopia context matters for:
 
 ### Stillness (live server) context
 
-Stillness is the production server. **Do not publish contracts to Stillness during development.** Stillness addresses are stored here for reference — production deployment happens only after full Utopia validation and only from `main` branch.
+Stillness is the live server. **Contracts published to Stillness on 2026-03-14** (branch `feat/stillness-and-player-names`). Frontend config retargeted to Stillness object IDs. Utopia deployment is now superseded.
+
+**Stillness Flappy Frontier deployment:**
+| Object | ID |
+|--------|----|
+| Package | `0x355b6228ae72f7cf64632ecd0bc7f13d3e5100f3f06699e45c3294633d9175e6` |
+| AdminCap | `0xc633e5f3896461f2d3a4f125e61dfe39c31211d013951fd14f476ea7eede77f7` |
+| GameConfig | `0x96127c4dbd75f883397a420b45a03c8af004890993c56cb91e48fce8860f5c57` |
+| Leaderboard | `0xeeda7b2193064213b5f2c1c7fb9c8f519f5facf812c4cf71fe029bc4bbba784d` |
+| Treasury<StillnessEVE> | `0xad7f49363fe1a35f47049ddcc6156b98b210cd603e453e88bd9e90faf6ab2813` |
+| UpgradeCap | `0x2dd8d599ea0629fa87debfcf072822f3125b12de90c75a744b594e350a48aa5a` |
+| Publish tx | `AoCPM4PTDzCnRGK1kAux9tQmg3mYgWobxpSpV73V4nNN` |
+| Init treasury tx | `7kwvmWFxCS8Qy7mwJyWnYowTEuvw5cAxcUxBZc5pPJ75` |
 
 ---
 

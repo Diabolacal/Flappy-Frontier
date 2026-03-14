@@ -5,4 +5,4 @@ compatibility_date = "2025-01-01"
 [vars]
 SUI_RPC_URL = "https://fullnode.testnet.sui.io:443"
 GAS_BUDGET = "50000000"
-ALLOWED_ORIGINS = "https://flappyfrontier.com,https://www.flappyfrontier.com,https://flappy-frontier.pages.dev,https://feat-phase1-move-contracts.flappy-frontier.pages.dev,http://localhost:5173"
+ALLOWED_ORIGINS = "https://flappyfrontier.com,https://www.flappyfrontier.com,https://flappy-frontier.pages.dev,http://localhost:5173"

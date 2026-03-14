@@ -6,6 +6,7 @@ interface StartScreenProps {
   bestScore: number;
   canPlayRanked: boolean;
   playerAddress: string | null;
+  playerDisplayName?: string;
   entryFeeDisplay: string;
   ssuWallet: SSUWalletInfo;
   onStart: (mode: GameMode) => void;
@@ -18,6 +19,7 @@ export function StartScreen({
   bestScore,
   canPlayRanked,
   playerAddress,
+  playerDisplayName,
   entryFeeDisplay,
   ssuWallet,
   onStart,
@@ -46,7 +48,7 @@ export function StartScreen({
           <div className="flex items-center gap-2">
             <span className="text-green-400 text-xs">●</span>
             <span className="text-gray-300 text-sm font-mono">
-              {playerAddress.slice(0, 6)}…{playerAddress.slice(-4)}
+              {playerDisplayName ?? `${playerAddress.slice(0, 6)}…${playerAddress.slice(-4)}`}
             </span>
             <button
               onClick={onDisconnect}

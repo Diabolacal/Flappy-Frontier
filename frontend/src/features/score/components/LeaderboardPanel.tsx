@@ -1,8 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useCurrentAccount } from '@mysten/dapp-kit';
 import { CONTRACT_CONFIG } from '@/lib/contractConfig';
 import { buildTriggerPayoutTransaction } from '@/features/score/services/scoreService';
 import { useGameTransaction } from '@/features/auth/hooks/useGameTransaction';
+import { usePlayerNames } from '@/features/auth/hooks/usePlayerName';
+import { formatPlayerDisplay } from '@/lib/playerNames';
 
 interface LeaderboardEntry {
   player: string;
@@ -17,25 +19,39 @@ interface LeaderboardData {
   currentEpoch: number;
 }
 
-function shortenAddress(addr: string): string {
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-}
-
 function formatEve(baseUnits: number): string {
   return (baseUnits / 1_000_000_000).toFixed(0);
 }
 
-function epochTimeState(epochStartMs: number, durationMs: number): { label: string; expired: boolean } {
-  const endMs = epochStartMs + durationMs;
+/** Compute the next Sunday 00:00 UTC after a given epoch start timestamp. */
+function getWeekEndMs(epochStartMs: number): number {
+  const d = new Date(epochStartMs);
+  const day = d.getUTCDay(); // 0=Sun
+  const daysUntilSunday = day === 0 ? 7 : 7 - day;
+  return Date.UTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate() + daysUntilSunday,
+    0, 0, 0, 0,
+  );
+}
+
+function weekTimeState(epochStartMs: number): { label: string; endMs: number; expired: boolean } {
+  const endMs = getWeekEndMs(epochStartMs);
   const remainMs = endMs - Date.now();
-  if (remainMs <= 0) return { label: 'Week ended', expired: true };
-  const minutes = Math.floor(remainMs / 60_000);
-  const seconds = Math.floor((remainMs % 60_000) / 1_000);
-  if (minutes > 60) {
-    const hours = Math.floor(minutes / 60);
-    return { label: `${hours}h ${minutes % 60}m`, expired: false };
+  if (remainMs <= 0) return { label: 'Week ended', endMs, expired: true };
+  const totalSeconds = Math.floor(remainMs / 1_000);
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  if (days > 0) {
+    return { label: `${days}d ${hours}h ${minutes}m`, endMs, expired: false };
   }
-  return { label: `${minutes}m ${seconds}s`, expired: false };
+  if (hours > 0) {
+    return { label: `${hours}h ${minutes}m`, endMs, expired: false };
+  }
+  const seconds = totalSeconds % 60;
+  return { label: `${minutes}m ${seconds}s`, endMs, expired: false };
 }
 
 export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
@@ -44,6 +60,13 @@ export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Resolve player names for leaderboard entries
+  const entryAddresses = useMemo(
+    () => (data?.entries ?? []).map((e) => e.player),
+    [data?.entries],
+  );
+  const playerNames = usePlayerNames(entryAddresses);
 
   // Payout trigger state
   const [isPayingOut, setIsPayingOut] = useState(false);
@@ -143,7 +166,7 @@ export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
   }, [isPayingOut, executeTransaction, fetchLeaderboard, account?.address, sponsorship.canSponsorGameTx]);
 
   const timeState = data
-    ? epochTimeState(data.epochStartMs, CONTRACT_CONFIG.epochDurationMs)
+    ? weekTimeState(data.epochStartMs)
     : null;
 
   return (
@@ -171,7 +194,7 @@ export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
                 </span>
               </div>
               <div className="flex justify-between text-xs text-gray-500">
-                <span>Week #{data.currentEpoch}</span>
+                <span>This Week</span>
                 <span>{timeState.expired
                   ? <span className="text-amber-400 font-semibold">Week ended</span>
                   : <>Time left: <span className="text-white">{timeState.label}</span></>
@@ -278,7 +301,7 @@ export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
                       {i + 1}
                     </td>
                     <td className="py-2 font-mono text-xs text-gray-300">
-                      {shortenAddress(entry.player)}
+                      {formatPlayerDisplay(entry.player, playerNames.get(entry.player) ?? null)}
                     </td>
                     <td className={`py-2 text-right font-bold ${i < 3 ? 'text-white' : 'text-gray-300'}`}>
                       {entry.score}

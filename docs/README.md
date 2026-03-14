@@ -44,6 +44,7 @@ Central map for all project documentation. Agents: start here for orientation.
 |----------|-------------|
 | `docs/plans/flappy-frontier-game-mvp-plan.md` | Game-side MVP implementation plan — rendering, physics, state model, assets, build phases |
 | `docs/plans/flappy-frontier-chain-integration-plan.md` | Chain integration execution plan — Move contracts, wallet wiring, Cloudflare deployment, Utopia validation |
+| `docs/plans/stillness-and-player-names-plan.md` | Stillness migration + player name resolution — config retarget, contract redeploy, character name lookup |
 
 ## Architecture
 
