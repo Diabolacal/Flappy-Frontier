@@ -46,6 +46,12 @@ Central map for all project documentation. Agents: start here for orientation.
 | `docs/plans/flappy-frontier-chain-integration-plan.md` | Chain integration execution plan — Move contracts, wallet wiring, Cloudflare deployment, Utopia validation |
 | `docs/plans/stillness-and-player-names-plan.md` | Stillness migration + player name resolution — config retarget, contract redeploy, character name lookup |
 
+## Reference
+
+| Document | Description |
+|----------|-------------|
+| `docs/reference/flappy-frontier-transfer-learnings.md` | Cross-project transfer learnings — reusable patterns, traps, and checklists from Flappy Frontier for future EVE Frontier / Sui hackathon projects |
+
 ## Architecture
 
 *Architecture docs will be added as implementation progresses.*
