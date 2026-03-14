@@ -12,14 +12,35 @@ use flappy_frontier::config::{GameConfig, AdminCap};
 use flappy_frontier::leaderboard::Leaderboard;
 use flappy_frontier::treasury::Treasury;
 
+// === Errors ===
+
+#[error]
+const EReceiptEpochMismatch: vector<u8> = b"RunReceipt is from a different epoch — start a new run";
+
+#[error]
+const EReceiptPlayerMismatch: vector<u8> = b"RunReceipt does not belong to the transaction sender";
+
+// === Structs ===
+
+/// Proof that a player paid the entry fee and started a ranked run.
+/// Created by `start_run`, consumed by `submit_score` or `discard_receipt`.
+/// Has `key` only — cannot be publicly transferred or wrapped.
+public struct RunReceipt has key {
+    id: UID,
+    player: address,
+    seed: u256,
+    epoch: u64,
+}
+
 // === Events ===
 
-/// Emitted when a ranked run starts. Frontend reads the seed from tx events.
+/// Emitted when a ranked run starts. Frontend reads the seed and receipt_id from tx events.
 public struct RunStartedEvent has copy, drop {
     player: address,
     seed: u256,
     epoch: u64,
     timestamp_ms: u64,
+    receipt_id: ID,
 }
 
 /// Emitted when a score is submitted to the leaderboard.
@@ -47,8 +68,8 @@ public struct LeaderboardResetEvent has copy, drop {
 
 // === Public Entry Functions ===
 
-/// Start a ranked run: pay entry fee, draw seed from sui::random.
-/// Returns change coin via PTB. Emits RunStartedEvent with the seed.
+/// Start a ranked run: pay entry fee, draw seed from sui::random, issue RunReceipt.
+/// The receipt must be consumed by `submit_score` or `discard_receipt`.
 ///
 /// T = coin type (EVE at call site). No compile-time dependency on assets package.
 entry fun start_run<T>(
@@ -69,39 +90,78 @@ entry fun start_run<T>(
 
     let timestamp_ms = clock.timestamp_ms();
     let epoch = treasury.current_epoch();
+    let player = ctx.sender();
+
+    // Create RunReceipt — proof of paid entry
+    let receipt = RunReceipt {
+        id: object::new(ctx),
+        player,
+        seed,
+        epoch,
+    };
+    let receipt_id = object::id(&receipt);
 
     event::emit(RunStartedEvent {
-        player: ctx.sender(),
+        player,
         seed,
         epoch,
         timestamp_ms,
+        receipt_id,
     });
+
+    // Transfer receipt to player (owned object — only they can use it)
+    transfer::transfer(receipt, player);
 }
 
 /// Submit a score to the on-chain leaderboard.
-/// Emits ScoreSubmittedEvent. Aborts if score doesn't qualify (checked by leaderboard module).
+/// Requires a valid RunReceipt from `start_run` — binds submission to fee payment.
+/// The receipt is consumed (deleted) regardless of whether the score qualifies.
+/// Emits ScoreSubmittedEvent.
+///
+/// SECURITY: The receipt guarantees the caller paid an entry fee and received a chain seed.
+/// The score itself is still player-reported — true proof-of-play is not enforced on-chain.
 #[allow(unused_mut_parameter)]
 entry fun submit_score<T>(
     leaderboard: &mut Leaderboard,
     treasury: &Treasury<T>,
+    receipt: RunReceipt,
     score: u64,
-    run_seed: u256,
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
-    let timestamp_ms = clock.timestamp_ms();
+    let sender = ctx.sender();
     let epoch = treasury.current_epoch();
-    let qualified = leaderboard.qualifies(score, timestamp_ms);
 
-    leaderboard.submit_score(ctx.sender(), score, run_seed, timestamp_ms);
+    // Validate receipt
+    assert!(receipt.player == sender, EReceiptPlayerMismatch);
+    assert!(receipt.epoch == epoch, EReceiptEpochMismatch);
+
+    let run_seed = receipt.seed;
+
+    // Consume receipt (delete the owned object)
+    let RunReceipt { id, player: _, seed: _, epoch: _ } = receipt;
+    id.delete();
+
+    let timestamp_ms = clock.timestamp_ms();
+
+    // Submit to leaderboard (returns whether entry was placed/updated)
+    let qualified = leaderboard.submit_score(sender, score, run_seed, timestamp_ms);
 
     event::emit(ScoreSubmittedEvent {
-        player: ctx.sender(),
+        player: sender,
         score,
         run_seed,
         epoch,
         qualified,
     });
+}
+
+/// Clean up a stale or unwanted RunReceipt without submitting a score.
+/// Use this when a run was started but the player doesn't want to submit
+/// (e.g., abandoned game, wrong epoch, etc.).
+entry fun discard_receipt(receipt: RunReceipt) {
+    let RunReceipt { id, player: _, seed: _, epoch: _ } = receipt;
+    id.delete();
 }
 
 /// Trigger payout at epoch end. ANYONE can call this — no AdminCap needed.
@@ -177,4 +237,44 @@ entry fun trigger_payout<T>(
 entry fun init_treasury<T>(_: &AdminCap, clock: &Clock, ctx: &mut TxContext) {
     let epoch_start_ms = clock.timestamp_ms();
     flappy_frontier::treasury::create<T>(epoch_start_ms, ctx);
+}
+
+// === Test Helpers ===
+
+#[test_only]
+public fun create_receipt_for_testing(
+    player: address,
+    seed: u256,
+    epoch: u64,
+    ctx: &mut TxContext,
+): RunReceipt {
+    RunReceipt {
+        id: object::new(ctx),
+        player,
+        seed,
+        epoch,
+    }
+}
+
+#[test_only]
+public fun destroy_receipt_for_testing(receipt: RunReceipt) {
+    let RunReceipt { id, player: _, seed: _, epoch: _ } = receipt;
+    id.delete();
+}
+
+#[test_only]
+public fun submit_score_for_testing<T>(
+    leaderboard: &mut Leaderboard,
+    treasury: &Treasury<T>,
+    receipt: RunReceipt,
+    score: u64,
+    clock: &Clock,
+    ctx: &mut TxContext,
+) {
+    submit_score(leaderboard, treasury, receipt, score, clock, ctx);
+}
+
+#[test_only]
+public fun discard_receipt_for_testing(receipt: RunReceipt) {
+    discard_receipt(receipt);
 }

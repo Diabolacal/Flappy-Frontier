@@ -3,11 +3,6 @@
 /// Ties broken by earlier timestamp (lower timestamp_ms ranks higher).
 module flappy_frontier::leaderboard;
 
-// === Errors ===
-
-#[error]
-const EScoreNotQualified: vector<u8> = b"Score does not qualify for the leaderboard";
-
 // === Structs ===
 
 /// A single leaderboard entry.
@@ -95,16 +90,48 @@ public fun qualifies(leaderboard: &Leaderboard, score: u64, timestamp_ms: u64): 
     false
 }
 
-/// Submit a score to the leaderboard. Aborts if score doesn't qualify.
-/// Inserts in sorted position (descending by score, ties broken by earlier timestamp).
+/// Submit a score to the leaderboard with per-player deduplication.
+/// Returns true if the entry was placed or updated, false if score didn't qualify
+/// or wasn't an improvement over the player's existing entry.
+///
+/// Per-player rules:
+/// - One entry per player per epoch.
+/// - If the player already has an entry with a higher or equal score, returns false.
+/// - If the player already has an entry with a lower score, replaces it.
+/// - If the player has no existing entry, normal qualification logic applies.
 public(package) fun submit_score(
     leaderboard: &mut Leaderboard,
     player: address,
     score: u64,
     run_seed: u256,
     timestamp_ms: u64,
-) {
-    assert!(qualifies(leaderboard, score, timestamp_ms), EScoreNotQualified);
+): bool {
+    // Check for existing entry by this player
+    let len = leaderboard.entries.length();
+    let mut existing_idx: u64 = len; // sentinel: no existing entry found
+    let mut i = 0;
+    while (i < len) {
+        if (leaderboard.entries[i].player == player) {
+            existing_idx = i;
+            break
+        };
+        i = i + 1;
+    };
+
+    if (existing_idx < len) {
+        // Player already has an entry — only replace if new score is strictly better
+        let existing_score = leaderboard.entries[existing_idx].score;
+        if (score <= existing_score) {
+            return false
+        };
+        // Remove old entry before re-inserting at new position
+        leaderboard.entries.remove(existing_idx);
+    };
+
+    // Check if score qualifies (after potentially removing old entry)
+    if (!qualifies(leaderboard, score, timestamp_ms)) {
+        return false
+    };
 
     let entry = LeaderboardEntry {
         player,
@@ -114,10 +141,10 @@ public(package) fun submit_score(
     };
 
     // Find insertion position (sorted descending by score, ties broken by earlier timestamp)
-    let len = leaderboard.entries.length();
-    let mut insert_pos = len; // default: end
-    let mut i = 0;
-    while (i < len) {
+    let current_len = leaderboard.entries.length();
+    let mut insert_pos = current_len; // default: end
+    i = 0;
+    while (i < current_len) {
         let existing = &leaderboard.entries[i];
         if (score > existing.score || (score == existing.score && timestamp_ms < existing.timestamp_ms)) {
             insert_pos = i;
@@ -133,6 +160,8 @@ public(package) fun submit_score(
     while (leaderboard.entries.length() > leaderboard.max_size) {
         leaderboard.entries.pop_back();
     };
+
+    true
 }
 
 // === Payout Helpers ===
@@ -178,6 +207,6 @@ public fun submit_score_for_testing(
     score: u64,
     run_seed: u256,
     timestamp_ms: u64,
-) {
-    submit_score(leaderboard, player, score, run_seed, timestamp_ms);
+): bool {
+    submit_score(leaderboard, player, score, run_seed, timestamp_ms)
 }

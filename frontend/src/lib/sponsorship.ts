@@ -31,6 +31,13 @@ export const EVEFRONTIER_SPONSORED_TRANSACTION =
 export const SPONSOR_SERVICE_URL: string =
   import.meta.env.VITE_SPONSOR_SERVICE_URL ?? '';
 
+/**
+ * API key for sponsor service authentication.
+ * Set via VITE_SPONSOR_API_KEY environment variable.
+ */
+const SPONSOR_API_KEY: string =
+  import.meta.env.VITE_SPONSOR_API_KEY ?? '';
+
 // ── Types ──────────────────────────────────────────────────────────
 
 export interface SponsorshipInfo {
@@ -105,9 +112,16 @@ export async function requestSponsorship(
 
   const txKindB64 = uint8ArrayToB64(txKindBytes);
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (SPONSOR_API_KEY) {
+    headers['Authorization'] = `Bearer ${SPONSOR_API_KEY}`;
+  }
+
   const res = await fetch(`${SPONSOR_SERVICE_URL}/sponsor`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ txKindB64, sender }),
   });
 

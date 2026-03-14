@@ -13,11 +13,12 @@ interface StoredScore {
 
 /**
  * Build a PTB for `game::submit_score<EVE>()`.
- * Caller signs and executes.
+ * Requires a RunReceipt object ID from a prior `start_run` transaction.
+ * The receipt is consumed (deleted) by the contract.
  */
 export function buildSubmitScoreTransaction(
   score: number,
-  runSeed: string,
+  receiptObjectId: string,
 ): Transaction {
   const tx = new Transaction();
 
@@ -27,8 +28,8 @@ export function buildSubmitScoreTransaction(
     arguments: [
       tx.object(CONTRACT_CONFIG.leaderboardId),
       tx.object(CONTRACT_CONFIG.treasuryId),
+      tx.object(receiptObjectId),
       tx.pure.u64(score),
-      tx.pure.u256(BigInt(runSeed)),
       tx.object(CONTRACT_CONFIG.clockObjectId),
     ],
   });

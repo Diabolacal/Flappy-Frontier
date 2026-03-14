@@ -4,7 +4,7 @@ import type { GamePhase, GameMode } from '@/game/types';
 import type { GameLoopHandle } from '@/game/gameLoop';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, RESTART_DELAY } from '@/game/constants';
 import { CONTRACT_CONFIG } from '@/lib/contractConfig';
-import { buildStartRunTransaction, parseSeedFromEvents } from '@/lib/seedProvider';
+import { buildStartRunTransaction, parseSeedFromEvents, parseReceiptIdFromEvents } from '@/lib/seedProvider';
 import { buildSubmitScoreTransaction, submitScore } from '@/features/score/services/scoreService';
 import { usePlayerIdentity } from '@/features/auth/hooks/usePlayerIdentity';
 import { useGameTransaction } from '@/features/auth/hooks/useGameTransaction';
@@ -53,7 +53,7 @@ export function GamePage({ ssuWallet }: GamePageProps) {
 
   // Ranked run state
   const [chainSeed, setChainSeed] = useState<number | undefined>(undefined);
-  const [chainRunSeed, setChainRunSeed] = useState<string | null>(null);
+  const [chainReceiptId, setChainReceiptId] = useState<string | null>(null);
   const [rankedError, setRankedError] = useState<string | null>(null);
 
   // Score submission state
@@ -82,12 +82,10 @@ export function GamePage({ ssuWallet }: GamePageProps) {
         const result = await executeTransaction(tx, player.address);
         const events = (result as { events?: Array<{ type: string; parsedJson?: Record<string, unknown> }> }).events ?? [];
         const seed = parseSeedFromEvents(events);
-        // Also extract the raw u256 seed for score submission
-        const runEvent = events.find((e) => e.type.includes('::game::RunStartedEvent'));
-        const rawSeed = String(runEvent?.parsedJson?.['seed'] ?? '0');
+        const receiptId = parseReceiptIdFromEvents(events);
 
         setChainSeed(seed);
-        setChainRunSeed(rawSeed);
+        setChainReceiptId(receiptId);
         setScreenState('ready');
         setIsCanvasActive(true);
       } catch (err) {
@@ -110,7 +108,7 @@ export function GamePage({ ssuWallet }: GamePageProps) {
     } else {
       // Practice: synchronous local seed
       setChainSeed(undefined);
-      setChainRunSeed(null);
+      setChainReceiptId(null);
       setScreenState('ready');
       setIsCanvasActive(true);
     }
@@ -136,14 +134,14 @@ export function GamePage({ ssuWallet }: GamePageProps) {
   }, []);
 
   const handleSubmitScore = useCallback(async () => {
-    if (!chainRunSeed || isSubmitting) return;
+    if (!chainReceiptId || isSubmitting) return;
     setIsSubmitting(true);
     setSubmitError(null);
 
     const scoreToSubmit = finalScoreRef.current || displayScore;
 
     try {
-      const tx = buildSubmitScoreTransaction(scoreToSubmit, chainRunSeed);
+      const tx = buildSubmitScoreTransaction(scoreToSubmit, chainReceiptId);
       const result = await executeTransaction(tx, player.address ?? '');
       const digest = (result as { digest?: string }).digest ?? null;
       setSubmitResult({ success: true, txDigest: digest });
@@ -171,21 +169,21 @@ export function GamePage({ ssuWallet }: GamePageProps) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [chainRunSeed, chainSeed, displayScore, isSubmitting, player.address, executeTransaction, sponsorship.canSponsorGameTx]);
+  }, [chainReceiptId, chainSeed, displayScore, isSubmitting, player.address, executeTransaction, sponsorship.canSponsorGameTx]);
 
   // Auto-submit score for ranked runs when game ends
   useEffect(() => {
     if (
       screenState === 'gameOver' &&
       selectedMode === 'ranked' &&
-      chainRunSeed &&
+      chainReceiptId &&
       !submitResult &&
       !isSubmitting &&
       !submitError
     ) {
       void handleSubmitScore();
     }
-  }, [screenState, selectedMode, chainRunSeed, submitResult, isSubmitting, submitError, handleSubmitScore]);
+  }, [screenState, selectedMode, chainReceiptId, submitResult, isSubmitting, submitError, handleSubmitScore]);
 
   const handleRestart = useCallback(async () => {
     if (!canRestartRef.current) return;
@@ -201,11 +199,10 @@ export function GamePage({ ssuWallet }: GamePageProps) {
         const result = await executeTransaction(tx, player.address);
         const events = (result as { events?: Array<{ type: string; parsedJson?: Record<string, unknown> }> }).events ?? [];
         const seed = parseSeedFromEvents(events);
-        const runEvent = events.find((e) => e.type.includes('::game::RunStartedEvent'));
-        const rawSeed = String(runEvent?.parsedJson?.['seed'] ?? '0');
+        const receiptId = parseReceiptIdFromEvents(events);
 
         setChainSeed(seed);
-        setChainRunSeed(rawSeed);
+        setChainReceiptId(receiptId);
         loopRef.current?.restart(selectedMode, seed);
         setScreenState('ready');
       } catch (err) {
@@ -223,7 +220,7 @@ export function GamePage({ ssuWallet }: GamePageProps) {
     setIsCanvasActive(false);
     setScreenState('menu');
     setChainSeed(undefined);
-    setChainRunSeed(null);
+    setChainReceiptId(null);
     setRankedError(null);
   }, []);
 

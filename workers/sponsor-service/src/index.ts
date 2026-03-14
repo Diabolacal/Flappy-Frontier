@@ -30,6 +30,10 @@ interface Env {
   ALLOWED_ORIGINS?: string;
   /** Gas budget in MIST (defaults to 50_000_000 = 0.05 SUI) */
   GAS_BUDGET?: string;
+  /** Shared secret API key — callers must send Authorization: Bearer <key> */
+  SPONSOR_API_KEY?: string;
+  /** Flappy Frontier package ID — only MoveCall targets matching this are sponsored */
+  ALLOWED_PACKAGE_ID?: string;
 }
 
 interface SponsorRequest {
@@ -55,6 +59,28 @@ const DEFAULT_ALLOWED_ORIGINS = [
 
 /** Wildcard suffix patterns — origins ending with these are allowed */
 const ALLOWED_ORIGIN_SUFFIXES = ['.flappy-frontier.pages.dev'];
+
+// ── Intent Validation ──────────────────────────────────────────────
+
+/** Only these game module functions may be sponsored */
+const ALLOWED_FUNCTIONS = new Set([
+  'start_run',
+  'submit_score',
+  'trigger_payout',
+  'discard_receipt',
+]);
+
+/** Only the game orchestration module is allowed */
+const ALLOWED_MODULE = 'game';
+
+/** Max commands per sponsored transaction (PTBs include coin-split helpers) */
+const MAX_COMMANDS = 6;
+
+/** Max request body size in bytes */
+const MAX_BODY_BYTES = 16_384;
+
+/** Command kinds that must never appear in sponsored transactions */
+const DENIED_COMMAND_KINDS = new Set(['Publish', 'Upgrade']);
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -85,7 +111,7 @@ function corsHeaders(origin: string | null, env: Env): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': matched,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -118,6 +144,82 @@ function fromBase64(b64: string): Uint8Array {
   return bytes;
 }
 
+// ── Security ───────────────────────────────────────────────────────
+
+/** Verify Bearer token matches the configured API key */
+function checkAuth(request: Request, env: Env): boolean {
+  if (!env.SPONSOR_API_KEY) return true; // no key configured = auth disabled
+  const auth = request.headers.get('Authorization');
+  if (!auth) return false;
+  const parts = auth.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') return false;
+  return parts[1] === env.SPONSOR_API_KEY;
+}
+
+/**
+ * Validate that the TransactionKind only targets Flappy Frontier game functions.
+ * Allows supporting PTB commands (SplitCoins, MergeCoins, etc.) but enforces
+ * that every MoveCall targets the allowed package/module/function.
+ */
+function validateIntent(
+  kindBytes: Uint8Array,
+  env: Env,
+): { valid: boolean; reason?: string } {
+  const packageId = env.ALLOWED_PACKAGE_ID;
+  if (!packageId) return { valid: true }; // skip if not configured
+
+  let tx: Transaction;
+  try {
+    tx = Transaction.fromKind(kindBytes);
+  } catch {
+    return { valid: false, reason: 'Malformed transaction' };
+  }
+
+  const data = tx.getData();
+  const commands: Array<{ $kind: string; [key: string]: unknown }> =
+    data.commands as Array<{ $kind: string; [key: string]: unknown }>;
+
+  if (!Array.isArray(commands) || commands.length === 0) {
+    return { valid: false, reason: 'Empty transaction' };
+  }
+  if (commands.length > MAX_COMMANDS) {
+    return { valid: false, reason: 'Too many commands' };
+  }
+
+  const normalPkg = packageId.toLowerCase();
+  let hasMoveCall = false;
+
+  for (const cmd of commands) {
+    const kind = cmd.$kind;
+    if (DENIED_COMMAND_KINDS.has(kind)) {
+      return { valid: false, reason: `Disallowed command: ${kind}` };
+    }
+    if (kind !== 'MoveCall') continue;
+    hasMoveCall = true;
+
+    const call = cmd.MoveCall as {
+      package: string;
+      module: string;
+      function: string;
+    };
+    if (call.package.toLowerCase() !== normalPkg) {
+      return { valid: false, reason: 'Disallowed package' };
+    }
+    if (call.module !== ALLOWED_MODULE) {
+      return { valid: false, reason: 'Disallowed module' };
+    }
+    if (!ALLOWED_FUNCTIONS.has(call.function)) {
+      return { valid: false, reason: 'Disallowed function' };
+    }
+  }
+
+  if (!hasMoveCall) {
+    return { valid: false, reason: 'No MoveCall commands' };
+  }
+
+  return { valid: true };
+}
+
 // ── Worker Entry Point ─────────────────────────────────────────────
 
 export default {
@@ -134,6 +236,17 @@ export default {
     const url = new URL(request.url);
     if (request.method !== 'POST' || url.pathname !== '/sponsor') {
       return jsonResponse({ error: 'Not Found' }, 404, cors);
+    }
+
+    // ── Caller authentication ──
+    if (!checkAuth(request, env)) {
+      return jsonResponse({ error: 'Unauthorized' }, 401, cors);
+    }
+
+    // ── Body size guard ──
+    const contentLength = request.headers.get('Content-Length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
+      return jsonResponse({ error: 'Request too large' }, 413, cors);
     }
 
     // Health check: sponsor key must be configured
@@ -176,17 +289,32 @@ export default {
 
       // Create Sui client
       const rpcUrl = env.SUI_RPC_URL || DEFAULT_RPC;
-      const client = new SuiJsonRpcClient({ url: rpcUrl });
+      const client = new SuiJsonRpcClient({ url: rpcUrl, network: 'testnet' });
 
       // Reconstruct transaction from kind bytes, add gas sponsorship
       const kindBytes = fromBase64(txKindB64);
+
+      // ── Intent validation ──
+      const intent = validateIntent(kindBytes, env);
+      if (!intent.valid) {
+        console.warn('[sponsor-service] Intent rejected:', intent.reason);
+        return jsonResponse(
+          { error: `Transaction rejected: ${intent.reason}` },
+          403,
+          cors,
+        );
+      }
+
       const tx = Transaction.fromKind(kindBytes);
       tx.setSender(sender);
       tx.setGasOwner(sponsorAddress);
 
-      const gasBudget = env.GAS_BUDGET
+      const parsedBudget = env.GAS_BUDGET
         ? parseInt(env.GAS_BUDGET, 10)
-        : DEFAULT_GAS_BUDGET;
+        : NaN;
+      const gasBudget = Number.isNaN(parsedBudget)
+        ? DEFAULT_GAS_BUDGET
+        : parsedBudget;
       tx.setGasBudget(gasBudget);
 
       // Build full transaction (resolves sponsor's gas coins via RPC)
@@ -203,9 +331,16 @@ export default {
 
       return jsonResponse(response, 200, cors);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Internal error';
-      console.error('[sponsor-service]', message);
-      return jsonResponse({ error: message }, 500, cors);
+      // Log full error server-side; return generic message to client (M-4)
+      console.error(
+        '[sponsor-service] Error:',
+        err instanceof Error ? err.message : err,
+      );
+      return jsonResponse(
+        { error: 'Sponsorship failed. Please try again.' },
+        500,
+        cors,
+      );
     }
   },
 } satisfies ExportedHandler<Env>;
