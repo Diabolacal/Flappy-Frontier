@@ -8,6 +8,7 @@ interface GameOverScreenProps {
   onSubmitScore: () => void;
   onRestart: () => void;
   onMenu: () => void;
+  onShowLeaderboard?: () => void;
 }
 
 export function GameOverScreen({
@@ -20,18 +21,19 @@ export function GameOverScreen({
   onSubmitScore,
   onRestart,
   onMenu,
+  onShowLeaderboard,
 }: GameOverScreenProps) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-10">
-      <h2 className="text-3xl font-bold tracking-widest text-red-400 mb-6">
+      <h2 className="text-3xl font-bold tracking-widest text-red-500 mb-6">
         GAME OVER
       </h2>
 
-      <div className="bg-gray-900/80 rounded-lg p-6 mb-6 min-w-[200px] text-center border border-gray-700">
+      <div className="bg-gray-900/80 rounded-lg p-6 mb-6 w-56 text-center border border-gray-700">
         <div className="text-gray-400 text-sm mb-1">Score</div>
         <div className="text-white text-4xl font-bold mb-4">{score}</div>
-        <div className="text-gray-400 text-sm mb-1">Best</div>
-        <div className="text-orange-400 text-2xl font-bold">{bestScore}</div>
+        <div className="text-gray-400 text-sm mb-1">{isRanked ? 'Ranked Best' : 'Practice Best'}</div>
+        <div className="text-2xl font-bold" style={{ color: '#ff4c26' }}>{bestScore}</div>
         {score >= bestScore && score > 0 && (
           <div className="text-yellow-400 text-xs mt-2">★ New Best!</div>
         )}
@@ -70,9 +72,11 @@ export function GameOverScreen({
               <button
                 onClick={onSubmitScore}
                 disabled={isSubmitting}
-                className="py-2 px-4 rounded bg-orange-600 hover:bg-orange-500
-                           text-white font-bold text-sm transition-colors
+                className="py-2 px-4 rounded text-white font-bold text-sm transition-colors
                            disabled:opacity-50 disabled:cursor-wait"
+                style={{ backgroundColor: '#ff4c26' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e6441f'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ff4c26'; }}
               >
                 Retry Submit
               </button>
@@ -86,14 +90,26 @@ export function GameOverScreen({
         </div>
       )}
 
-      <div className="flex flex-col gap-3 w-48">
+      <div className="flex flex-col gap-3 w-56">
         <button
           onClick={onRestart}
-          className="py-3 px-6 rounded-lg bg-orange-600 hover:bg-orange-500
-                     text-white font-bold transition-colors"
+          className="py-3 px-6 rounded-lg text-white font-bold transition-colors"
+          style={{ backgroundColor: '#ff4c26' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e6441f'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ff4c26'; }}
         >
           {isRanked ? 'NEW RANKED RUN' : 'RESTART'}
         </button>
+        {isRanked && onShowLeaderboard && (
+          <button
+            onClick={onShowLeaderboard}
+            className="py-2 px-6 rounded-lg border border-gray-600 hover:border-gray-500
+                       text-sm transition-colors"
+            style={{ color: '#ff4c26' }}
+          >
+            VIEW LEADERBOARD
+          </button>
+        )}
         <button
           onClick={onMenu}
           className="py-2 px-6 rounded-lg bg-gray-700 hover:bg-gray-600

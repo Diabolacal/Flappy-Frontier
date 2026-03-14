@@ -48,7 +48,7 @@ async function loadImageToBitmap(
 
 export async function loadAssets(): Promise<GameAssets> {
   const [shipBitmap, pipeBitmap, pipeCapBitmap, groundBitmap] = await Promise.all([
-    loadImageToBitmap('/assets/frontier-ship.png', 240, 84),
+    loadImageToBitmap('/assets/frontier-ship.png', 264, 60),
     loadImageToBitmap('/assets/pipe-body.svg', 70, 600),
     loadImageToBitmap('/assets/pipe-cap.svg', 78, 20),
     loadImageToBitmap('/assets/ground-tile.svg', 128, 40),

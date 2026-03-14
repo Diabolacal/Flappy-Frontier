@@ -14,6 +14,7 @@ import { GameCanvas } from './GameCanvas';
 import { StartScreen } from './StartScreen';
 import { GameOverScreen } from './GameOverScreen';
 import { ReadyOverlay } from './ReadyOverlay';
+import { LogoBadge } from './LogoBadge';
 
 type ScreenState = 'menu' | 'startingRanked' | 'ready' | 'playing' | 'dying' | 'gameOver';
 
@@ -33,7 +34,14 @@ export function GamePage({ ssuWallet }: GamePageProps) {
   const [displayScore, setDisplayScore] = useState(0);
   const [displayBestScore, setDisplayBestScore] = useState(() => {
     try {
-      return parseInt(localStorage.getItem('flappy-frontier-best') ?? '0', 10) || 0;
+      // Show max of both mode bests on initial load (before a mode is selected)
+      const practice = parseInt(localStorage.getItem('flappy-frontier-best-practice') ?? '0', 10) || 0;
+      const ranked = parseInt(localStorage.getItem('flappy-frontier-best-ranked') ?? '0', 10) || 0;
+      if (practice === 0 && ranked === 0) {
+        // Migration: fall back to legacy shared key
+        return parseInt(localStorage.getItem('flappy-frontier-best') ?? '0', 10) || 0;
+      }
+      return Math.max(practice, ranked);
     } catch { return 0; }
   });
   const [selectedMode, setSelectedMode] = useState<GameMode>('practice');
@@ -83,7 +91,7 @@ export function GamePage({ ssuWallet }: GamePageProps) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to start ranked run';
         if (msg.includes('No EVE coins') || msg.includes('Insufficient EVE')) {
-          setRankedError(msg);
+          setRankedError('Not enough EVE for the entry fee. Open Keeper > Wallet > Open Currency Exchange and swap LUX to EVE (10 LUX = 100 EVE).');
         } else if (msg.includes('insufficient') || msg.includes('gas')) {
           setRankedError(
             sponsorship.canSponsorGameTx
@@ -301,7 +309,7 @@ export function GamePage({ ssuWallet }: GamePageProps) {
 
         {screenState === 'startingRanked' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10">
-            <div className="text-orange-400 text-lg font-bold mb-2">Starting Ranked Run…</div>
+            <div className="text-lg font-bold mb-2" style={{ color: '#ff4c26' }}>Starting Ranked Run…</div>
             <div className="text-gray-300 text-sm mb-2">
               Entry fee: {ENTRY_FEE_DISPLAY}
             </div>
@@ -310,8 +318,8 @@ export function GamePage({ ssuWallet }: GamePageProps) {
             </div>
             <div className="text-gray-500 text-xs mb-3">
               {sponsorship.canSponsorGameTx
-                ? 'Approve the transaction in your wallet (EVE fee only — gas is sponsored).'
-                : 'Approve the transaction in your wallet (EVE fee + SUI gas).'}
+                ? 'Approve the transaction in your wallet. EVE fee only, gas is sponsored.'
+                : 'Approve the transaction in your wallet. EVE fee + SUI gas.'}
             </div>
             <button
               onClick={handleMenu}
@@ -335,6 +343,7 @@ export function GamePage({ ssuWallet }: GamePageProps) {
             onSubmitScore={handleSubmitScore}
             onRestart={handleRestart}
             onMenu={handleMenu}
+            onShowLeaderboard={() => setShowLeaderboard(true)}
           />
         )}
 
@@ -346,8 +355,8 @@ export function GamePage({ ssuWallet }: GamePageProps) {
             <div className="text-xs mb-1">{rankedError}</div>
             <div className="text-xs text-red-400/60">
               {sponsorship.canSponsorGameTx
-                ? 'Ranked mode requires EVE for the entry fee. Gas is sponsored.'
-                : 'Ranked mode requires EVE for the entry fee and SUI for gas.'}
+                ? 'Ranked requires 100 EVE entry fee. Gas is sponsored.'
+                : 'Ranked requires 100 EVE entry fee and SUI for gas.'}
             </div>
             <button
               onClick={() => setRankedError(null)}
@@ -357,6 +366,9 @@ export function GamePage({ ssuWallet }: GamePageProps) {
             </button>
           </div>
         )}
+
+        {/* Brand badge — bottom-right of playspace */}
+        <LogoBadge />
       </div>
 
       {/* Leaderboard panel (full-screen overlay) */}

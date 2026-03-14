@@ -59,7 +59,7 @@ export function startGameLoop(
   canvas.width = CANVAS_WIDTH;
   canvas.height = CANVAS_HEIGHT;
 
-  let state: GameState = createInitialState('practice', loadBestScore());
+  let state: GameState = createInitialState('practice', loadBestScore('practice'));
   let assets: GameAssets = { shipBitmap: null, pipeBitmap: null, pipeCapBitmap: null, groundBitmap: null };
   let rafId = 0;
   let lastTime = 0;
@@ -154,7 +154,7 @@ export function startGameLoop(
       if ((state.phase as GamePhase) === 'dead') {
         const newBest = Math.max(state.score, state.bestScore);
         state.bestScore = newBest;
-        saveBestScore(newBest);
+        saveBestScore(newBest, state.mode);
         callbacks.onGameOver(state.score, newBest);
         callbacks.onPhaseChange('dead');
       }
@@ -175,7 +175,7 @@ export function startGameLoop(
 
   const handle: GameLoopHandle = {
     start(mode: GameMode, externalSeed?: number) {
-      state = createInitialState(mode, loadBestScore(), externalSeed);
+      state = createInitialState(mode, loadBestScore(mode), externalSeed);
       lastTime = 0;
       running = true;
       callbacks.onPhaseChange('ready');
@@ -187,7 +187,7 @@ export function startGameLoop(
       cleanupInput();
     },
     restart(mode: GameMode, externalSeed?: number) {
-      state = createInitialState(mode, loadBestScore(), externalSeed);
+      state = createInitialState(mode, loadBestScore(mode), externalSeed);
       lastTime = 0;
       callbacks.onScoreChange(0);
       callbacks.onPhaseChange('ready');
@@ -197,18 +197,21 @@ export function startGameLoop(
   return handle;
 }
 
-function loadBestScore(): number {
+function loadBestScore(mode: GameMode = 'practice'): number {
   try {
-    const val = localStorage.getItem('flappy-frontier-best');
-    return val ? parseInt(val, 10) || 0 : 0;
+    const val = localStorage.getItem(`flappy-frontier-best-${mode}`);
+    if (val) return parseInt(val, 10) || 0;
+    // Migration: fall back to legacy shared key on first load
+    const legacy = localStorage.getItem('flappy-frontier-best');
+    return legacy ? parseInt(legacy, 10) || 0 : 0;
   } catch {
     return 0;
   }
 }
 
-function saveBestScore(score: number): void {
+function saveBestScore(score: number, mode: GameMode = 'practice'): void {
   try {
-    localStorage.setItem('flappy-frontier-best', String(score));
+    localStorage.setItem(`flappy-frontier-best-${mode}`, String(score));
   } catch {
     // localStorage unavailable — ignore
   }

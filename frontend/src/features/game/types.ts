@@ -18,7 +18,7 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     requiresEntryFee: false,
     leaderboardEligible: false,
     label: 'Practice',
-    description: 'Free play — no wallet needed',
+    description: 'Free play - no wallet needed',
   },
   ranked: {
     mode: 'ranked',

@@ -12,18 +12,18 @@ export function ModeSelector({ onSelectMode, canPlayRanked, entryFeeDisplay }: M
     <div className="flex gap-4 w-full max-w-sm">
       <button
         onClick={() => onSelectMode('practice')}
-        className="flex-1 py-4 px-3 rounded-lg border-2 border-orange-500/50 bg-orange-950/40
-                   hover:bg-orange-900/50 hover:border-orange-400 transition-colors text-left"
+        className="flex-1 py-4 px-3 rounded-lg border border-gray-600 bg-gray-900/80
+                   hover:bg-gray-800/80 hover:border-gray-500 transition-colors text-left"
       >
-        <div className="text-orange-400 font-bold text-lg">{GAME_MODES.practice.label}</div>
+        <div className="font-bold text-lg" style={{ color: '#ff4c26' }}>{GAME_MODES.practice.label}</div>
         <div className="text-gray-400 text-sm mt-1">{GAME_MODES.practice.description}</div>
       </button>
       <button
         disabled={!canPlayRanked}
         onClick={() => onSelectMode('ranked')}
-        className={`flex-1 py-4 px-3 rounded-lg border-2 text-left relative transition-colors ${
+        className={`flex-1 py-4 px-3 rounded-lg border text-left relative transition-colors ${
           canPlayRanked
-            ? 'border-orange-500/50 bg-orange-950/40 hover:bg-orange-900/50 hover:border-orange-400 cursor-pointer'
+            ? 'border-gray-600 bg-gray-900/80 hover:bg-gray-800/80 hover:border-gray-500 cursor-pointer'
             : 'border-gray-700 bg-gray-900/40 opacity-50 cursor-not-allowed'
         }`}
         title={canPlayRanked ? `Entry fee: ${entryFeeDisplay}` : 'Connect wallet to play ranked'}
@@ -33,7 +33,9 @@ export function ModeSelector({ onSelectMode, canPlayRanked, entryFeeDisplay }: M
             🔒
           </div>
         )}
-        <div className={`font-bold text-lg ${canPlayRanked ? 'text-orange-400' : 'text-gray-400'}`}>
+        <div className={`font-bold text-lg ${canPlayRanked ? '' : 'text-gray-400'}`}
+          style={canPlayRanked ? { color: '#ff4c26' } : undefined}
+        >
           {GAME_MODES.ranked.label}
         </div>
         <div className={`text-sm mt-1 ${canPlayRanked ? 'text-gray-400' : 'text-gray-500'}`}>

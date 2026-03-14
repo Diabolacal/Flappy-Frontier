@@ -6,9 +6,9 @@ export const CANVAS_HEIGHT = 1198;
 export const GROUND_HEIGHT = 40;
 export const PLAY_AREA_HEIGHT = CANVAS_HEIGHT - GROUND_HEIGHT;
 
-// Ship — sized for the Frontier ship raster sprite (original ~4.5:1 aspect)
-export const SHIP_WIDTH = 120;
-export const SHIP_HEIGHT = 42;
+// Ship — sized for the Frontier ship raster sprite (original ~4.4:1 aspect)
+export const SHIP_WIDTH = 132;
+export const SHIP_HEIGHT = 30;
 export const SHIP_X = 150; // fixed X (~19% of canvas width)
 export const SHIP_START_Y = PLAY_AREA_HEIGHT * 0.4;
 

@@ -65,3 +65,6 @@ temp_*
 *.bak
 *.swp
 *~
+
+# Local cross-project reference files
+frontend/_reference/
