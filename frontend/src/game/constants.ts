@@ -38,7 +38,6 @@ export const THRUSTER_PULSE_HZ = 2;
 export const ATTITUDE_JET_DURATION = 0.15; // seconds
 
 // Timing
-export const MAX_GAME_TIME = 120; // seconds
 export const RESTART_DELAY = 500; // ms
 
 // Ship pitch (subtle for capital ship feel)

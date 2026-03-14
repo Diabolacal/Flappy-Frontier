@@ -1,8 +1,8 @@
 # Flappy Frontier — Chain Integration Execution Plan
 
 **Retention:** Carry-forward  
-**Date:** 2026-03-13  
-**Status:** Planning complete — ready for implementation  
+**Date:** 2026-03-14  
+**Status:** Phase 4 complete — Cloudflare deployment live; sponsor service deployed as Cloudflare Worker (`flappy-frontier-sponsor`); dedicated sponsor wallet generated (Ed25519); frontend deployed to Cloudflare Pages (`flappy-frontier`); sponsor service URL baked into production build; CORS configured for Pages preview + production + localhost; sponsorship pending activation — operator must set `SPONSOR_PRIVATE_KEY` secret on the worker and fund the sponsor wallet with testnet SUI; all prior phases (contracts, frontend chain wiring, SSU wallet UX, sponsorship client) remain complete  
 **Author:** Planning agent  
 **Risk class:** High (Move contracts + treasury logic + wallet integration + deployment)  
 **Depends on:** Game-side MVP (complete), Sui testnet access, deployer wallet with SUI + EVE, EVE coin type ✅ confirmed on Utopia
@@ -36,7 +36,7 @@ The plan is designed for sequential implementation across 5 work phases, optimiz
 | Future seams (auth, score, seed, mode config) | ✅ Stubbed | See §2a below |
 | Move contracts | ❌ Not started | `contracts/flappy_frontier/sources/` is empty |
 | Wallet integration | ❌ Not started | No Sui SDK deps installed |
-| Cloudflare deployment | ❌ Not started | Templates exist, not configured |
+| Cloudflare deployment | ✅ Deployed | Pages: `flappy-frontier.pages.dev`, Worker: `flappy-frontier-sponsor` |
 
 ### 2a. Existing Future Seams (implementation anchors)
 
@@ -86,10 +86,20 @@ The thinnest slice that satisfies the product vision and is manually verifiable:
 
 ### In-game vs external browser
 
-| Context | Wallet available | Mode available | Leaderboard visible |
-|---------|-----------------|----------------|-------------------|
-| External browser (desktop) | Yes (EVE Vault / any Sui wallet) | Practice + Ranked | Yes (read from chain) |
-| In-game CEF browser | No | Practice only | Yes (read-only, no submission) |
+| Context | Wallet available | Connection UX | Mode available | Leaderboard visible |
+|---------|-----------------|---------------|----------------|-------------------|
+| External browser (desktop) | Yes (EVE Vault / any Sui wallet) | Generic ConnectModal chooser | Practice + Ranked | Yes (read from chain) |
+| In-game SSU browser | Yes (EVE Frontier Client Wallet — exactly 1 injected Sui wallet) | Auto-connect on load; "Use Game Client Wallet" direct button as fallback — no generic chooser | Practice + Ranked (if wallet connected) | Yes (read from chain, submission if wallet connected) |
+
+### SSU wallet runtime evidence (confirmed via EFMap Probe)
+
+- Exactly 1 Sui Wallet Standard wallet injected
+- Wallet name: `EVE Frontier Client Wallet`
+- Capabilities: `standard:connect`, `standard:disconnect`, `standard:events`, `sui:signPersonalMessage`, `sui:signTransaction`, `sui:signAndExecuteTransaction`, `evefrontier:sponsoredTransaction`
+- Provider: injected Sui (Wallet Standard)
+- **Detection method:** wallet runtime evidence (`useWallets()` → find by name), NOT viewport dimensions
+- **Viewport (`787×1198`):** used for layout scaling only, not wallet behavior
+- **Sponsored transactions:** `evefrontier:sponsoredTransaction` capability detected on both SSU and Eve Vault wallets. Investigation confirmed it is **assembly-scoped**: requires `assembly` (object ID), `assemblyType`, and `txAction` parameters routed to `https://api.{tier}.tech.evefrontier.com/transactions/sponsored/{assemblyType}/{action}`. Cannot be used for game contract calls (`start_run`, `submit_score`, `trigger_payout`). Sui-native gas sponsorship (dual-signature: player + sponsor) implemented client-side via `useGameTransaction` hook — activates when `VITE_SPONSOR_SERVICE_URL` is configured.
 
 ---
 
@@ -117,13 +127,17 @@ The thinnest slice that satisfies the product vision and is manually verifiable:
 | **EVE:LUX rate** | 1 EVE = 100 LUX (display conversion for in-game context) |
 | **Domain target** | `flappyfrontier.com` |
 
-### Derived at publish time (created during Phase 1)
+### Derived at publish time (Phase 2 — completed)
 
-| Item | When available | How obtained |
-|------|---------------|-------------|
-| **Flappy Frontier Package ID** | After `sui client publish` | From publish tx effects |
-| **Leaderboard Object ID** | After `init()` runs | From publish tx created objects |
-| **Treasury Object ID** | After `init()` runs | From publish tx created objects |
+| Item | Value | How obtained |
+|------|-------|-------------|
+| **Flappy Frontier Package ID** | `0xa23c94bd1ec5dc6516573fccd3af0f756057fb83170bc4d0d37082007ee49867` | Publish tx `EDskNKWvcvyHPqQrJuppHhSa46XY7gfofiTMKu9ihGGf` |
+| **AdminCap Object ID** | `0x78d4b07dd93cf96de22410f700a18777fcbe444b6430a8b5c8bdaadd4ed1e10d` | Created by `config::init()` at publish, owned by deployer |
+| **GameConfig Object ID** | `0xb46195f179cd1ee5be6f6703db0965ce42c08585a3fa055b0dc11d10b8c1103a` | Created by `config::init()` at publish, shared |
+| **Leaderboard Object ID** | `0xff84ea77cc26f1722879e4f9511f629ab17432ac7c0f805a4eeccdb09f294327` | Created by `leaderboard::create()` via `config::init()` at publish, shared |
+| **Treasury\<EVE\> Object ID** | `0xe9aa35d0eb9aad2514cd7dde9626808dd48444042f28c098eb7bc476fefdd17b` | Created by post-publish `game::init_treasury<EVE>()` call, tx `Afs7jex1t97a4HdnY3psvMn6v6AwWLQc8NJZw8YTsMg`, shared |
+| **UpgradeCap Object ID** | `0xfb8e9a60a7b3d115e96aef61d2799fec1c359d133904e55c94d5451e71204b4a` | Created at publish, owned by deployer |
+| **Frontend config** | `frontend/src/lib/contractConfig.ts` | All IDs recorded for Phase 3 |
 
 ### Still needed before implementation
 
@@ -256,53 +270,76 @@ This allows manual observation of the full lifecycle (play → submit → wait �
 
 ---
 
-### Phase 2: Publish to Testnet + Record Object IDs
+### Phase 2: Publish to Testnet + Record Object IDs ✅ COMPLETE
 
 **Goal:** Contracts live on Sui testnet, object IDs recorded for frontend.  
 **Risk:** Medium (network interaction, publish transaction costs)  
-**Depends on:** Phase 1 complete, deployer wallet funded
+**Depends on:** Phase 1 complete, deployer wallet funded  
+**Status:** ✅ Complete (2026-03-14)
 
-#### Steps
+#### Actual publish/init flow (deviated from plan)
 
-1. Verify active environment: `sui client active-env` → must be testnet
-2. Ensure deployer has SUI: `sui client gas` → sufficient for publish
-3. Publish: `sui client publish --path contracts/flappy_frontier`
-4. Record from tx effects:
-   - Package ID
-   - Leaderboard object ID (shared)
-   - Treasury object ID (shared)
-   - AdminCap object ID (owned by deployer)
-5. Store IDs in `frontend/src/lib/contractConfig.ts` (new file):
+The plan assumed `init()` would create all shared objects at publish time. The actual implementation differs:
+
+- **At publish time** (`config::init`): Creates `AdminCap` (owned), `GameConfig` (shared), `Leaderboard` (shared via `leaderboard::create()`)
+- **Post-publish** (`game::init_treasury<T>`): `Treasury<EVE>` is generic and requires an explicit post-publish call with `AdminCap` + `Clock` to instantiate `Treasury<T>` for the specific coin type. This is correct by design — the generic `T` cannot be bound at publish time.
+
+#### Publish results
+
+| Step | Transaction | Key outputs |
+|------|------------|-------------|
+| Publish package | `EDskNKWvcvyHPqQrJuppHhSa46XY7gfofiTMKu9ihGGf` | Package, AdminCap, GameConfig, Leaderboard, UpgradeCap |
+| Init Treasury\<EVE\> | `Afs7jex1t97a4HdnY3psvMn6v6AwWLQc8NJZw8YTsMg` | Treasury\<EVE\> shared object |
+
+#### Verification results
+
+- ✅ Package exists on testnet (immutable)
+- ✅ AdminCap owned by deployer `0xacff...54b1`
+- ✅ GameConfig shared — entry_fee: 100B (100 EVE), epoch: 600k ms (10 min), shares: [50,30,20], max: 10
+- ✅ Leaderboard shared — empty entries, max_size: 10
+- ✅ Treasury\<EVE\> shared — balance: 0, epoch: 1
+- ✅ Admin mutation smoke test passed (`set_entry_fee` via AdminCap)
+- ⚠️ Full `start_run<EVE>` / `submit_score` smoke test deferred — wallet has no EVE tokens; will test in Phase 3 with wallet integration
+
+#### Object IDs stored in `frontend/src/lib/contractConfig.ts`
+
+#### Original planned steps (completed — see actual flow above)
+
+1. ~~Verify active environment: `sui client active-env` → must be testnet~~ ✅
+2. ~~Ensure deployer has SUI: `sui client gas` → sufficient for publish~~ ✅
+3. ~~Publish: `sui client publish contracts/flappy_frontier`~~ ✅
+4. ~~Record from tx effects~~ ✅ (see "Derived at publish time" table in §4)
+5. ~~Store IDs in `frontend/src/lib/contractConfig.ts`~~ ✅
+6. ~~Test basic interaction via CLI~~ ✅ (admin mutation test; full flow deferred to Phase 3)
 
 ```typescript
+// Actual contractConfig.ts — see frontend/src/lib/contractConfig.ts for real file
 export const CONTRACT_CONFIG = {
-  packageId: '0x...',
-  leaderboardId: '0x...',
-  treasuryId: '0x...',
   network: 'testnet',
   rpcUrl: 'https://fullnode.testnet.sui.io:443',
+  packageId: '0xa23c94bd1ec5dc6516573fccd3af0f756057fb83170bc4d0d37082007ee49867',
+  adminCapId: '0x78d4b07dd93cf96de22410f700a18777fcbe444b6430a8b5c8bdaadd4ed1e10d',
+  gameConfigId: '0xb46195f179cd1ee5be6f6703db0965ce42c08585a3fa055b0dc11d10b8c1103a',
+  treasuryId: '0xe9aa35d0eb9aad2514cd7dde9626808dd48444042f28c098eb7bc476fefdd17b',
+  leaderboardId: '0xff84ea77cc26f1722879e4f9511f629ab17432ac7c0f805a4eeccdb09f294327',
+  upgradeCapId: '0xfb8e9a60a7b3d115e96aef61d2799fec1c359d133904e55c94d5451e71204b4a',
   eveCoinType: '0xf0446b93345c1118f21239d7ac58fb82d005219b2016e100f074e4d17162a465::EVE::EVE',
-  entryFeeAmount: 100_000_000_000, // 100 EVE (9 decimals) — configurable
-  epochDurationMs: 600_000,  // 10 min for testing
+  entryFeeAmount: 100_000_000_000,
+  epochDurationMs: 600_000,
+  payoutShares: [50, 30, 20],
+  maxLeaderboardSize: 10,
+  clockObjectId: '0x6',
+  randomObjectId: '0x8',
 } as const;
 ```
 
-6. Test basic interaction via CLI:
-   ```bash
-   # Start a run (pay fee + get seed)
-   sui client call --package <pkg> --module game --function start_run ...
-   # Submit a score
-   sui client call --package <pkg> --module leaderboard --function submit_score ...
-   # Check leaderboard state
-   sui client object <leaderboard_id>
-   ```
+#### Verification ✅
 
-#### Verification
-
-- Package published successfully
-- All shared objects created
-- CLI smoke test: start_run → submit_score → leaderboard shows entry
-- Object IDs recorded in `contractConfig.ts`
+- ✅ Package published successfully
+- ✅ All shared objects created (AdminCap, GameConfig, Leaderboard at publish; Treasury<EVE> via post-publish init_treasury)
+- ✅ CLI smoke test: admin `set_entry_fee` succeeded via AdminCap
+- ⚠️ Full `start_run → submit_score → leaderboard` deferred — no EVE in wallet; Phase 3 scope
+- ✅ Object IDs recorded in `contractConfig.ts`
 
 ---
 
@@ -334,7 +371,7 @@ Keep `App.tsx` under 30 lines — providers in a separate `Providers.tsx` if nee
 
 Replace stubs in `features/auth/hooks/usePlayerIdentity.ts`:
 - `player.address` → `useCurrentAccount()?.address`
-- `canPlayRanked` → `!!account?.address && !isInGameBrowser`
+- `canPlayRanked` → `!!account?.address` (environment-agnostic; in-game wallet support confirmed)
 - `connect` → `useConnectWallet()` modal trigger
 - `disconnect` → `useDisconnectWallet()`
 
@@ -384,16 +421,16 @@ cd frontend && npm run build       # Must succeed
 ```
 
 Manual localhost smoke test:
-- [ ] Wallet connect button appears (not in in-game mode)
+- [ ] Wallet connect button appears (both in-game and external browser)
 - [ ] Connecting wallet populates player address
-- [ ] Ranked mode unlocks after wallet connect
+- [ ] Ranked mode unlocks after wallet connect (including in-game with EVE Frontier Client Wallet)
 - [ ] Starting ranked run → wallet approval prompt
 - [ ] After approval → game starts with chain seed
 - [ ] Game over → "Submit Score" button appears
 - [ ] Submitting score → wallet approval → leaderboard updates
 - [ ] Leaderboard panel shows top 10 from chain
 - [ ] Practice mode still works without wallet (no regression)
-- [ ] In-game mode detection still hides wallet UI
+- [ ] In-game mode detection correctly uses layout scaling only (wallet UI remains visible)
 
 ---
 
@@ -401,16 +438,42 @@ Manual localhost smoke test:
 
 **Goal:** Game accessible at a public URL for external browser and in-game testing.  
 **Risk:** Low–Medium (deployment config, DNS)  
-**Depends on:** Phase 3 basic flow working on localhost
+**Depends on:** Phase 3 basic flow working on localhost  
+**Status:** ✅ Complete (2026-03-13)
 
-#### Steps
+#### Deployment Architecture
 
-1. Configure `wrangler.toml` from template (`templates/cloudflare/wrangler.example.jsonc`)
-2. Set environment variables for contract config (or bake into build)
-3. Build: `cd frontend && npm run build`
-4. Deploy preview: `cd frontend && npx wrangler pages deploy dist`
-5. Record preview URL (e.g., `flappy-frontier-xxx.pages.dev`)
-6. Configure custom domain `flappyfrontier.com` when DNS is ready
+- **Frontend:** Cloudflare Pages project `flappy-frontier`
+  - Production URL: `https://flappy-frontier.pages.dev`
+  - Preview URL: `https://feat-phase1-move-contracts.flappy-frontier.pages.dev`
+  - Config: `frontend/wrangler.jsonc`
+- **Sponsor Service:** Cloudflare Worker `flappy-frontier-sponsor`
+  - URL: `https://flappy-frontier-sponsor.michael-davis-home.workers.dev`
+  - Config: `workers/sponsor-service/wrangler.toml`
+  - API: `POST /sponsor { txKindB64, sender } → { txB64, sponsorSignature }`
+- **Sponsor Wallet:** Dedicated Ed25519 keypair for testnet gas sponsorship
+  - Address: `0x0d6fa6c31dba20dd18a828c08c46ca20f81d96bf24180fb64dfdceb474aca01f`
+  - Secret stored as Cloudflare secret `SPONSOR_PRIVATE_KEY` (bech32 `suiprivkey1...`)
+  - Needs: set secret via `wrangler secret put`, fund with testnet SUI faucet
+
+#### Completed Steps
+
+1. ~~Configure `wrangler.toml` from template~~ ✅ — `frontend/wrangler.jsonc` (Pages) + `workers/sponsor-service/wrangler.toml` (Worker)
+2. ~~Set environment variables~~ ✅ — `VITE_SPONSOR_SERVICE_URL` baked into Vite build at deploy time
+3. ~~Build~~ ✅ — `npm run build` passes, sponsor URL confirmed in bundle
+4. ~~Deploy preview~~ ✅ — Both Pages and Worker deployed
+5. ~~Record preview URL~~ ✅ — See above
+6. [ ] Configure custom domain `flappyfrontier.com` — requires DNS CNAME setup
+
+#### Pending Manual Steps (Operator)
+
+1. **Set sponsor secret:** `cd workers/sponsor-service && npx wrangler secret put SPONSOR_PRIVATE_KEY`  
+   → Paste the bech32 private key (`suiprivkey1...`) when prompted  
+   → No redeploy needed — Workers pick up secrets immediately
+2. **Fund sponsor wallet:** Request testnet SUI from faucet for address `0x0d6fa6c31dba20dd18a828c08c46ca20f81d96bf24180fb64dfdceb474aca01f`  
+   → Via CLI: `sui client faucet --address 0x0d6fa6c31dba20dd18a828c08c46ca20f81d96bf24180fb64dfdceb474aca01f`  
+   → Or via web: `https://faucet.testnet.sui.io/` (paste address)
+3. **Custom domain:** Configure `flappyfrontier.com` DNS CNAME → `flappy-frontier.pages.dev` in Cloudflare DNS dashboard
 
 #### Why Cloudflare happens AFTER chain wiring (not before)
 
@@ -427,10 +490,12 @@ The correct sequence is: **build chain flow on localhost → deploy to Cloudflar
 
 #### Verification
 
-- [ ] Preview URL loads game
-- [ ] Wallet connect works on deployed URL
-- [ ] Ranked flow works end-to-end on deployed URL
+- [x] Preview URL loads game — `https://feat-phase1-move-contracts.flappy-frontier.pages.dev` returns 200
+- [ ] Wallet connect works on deployed URL — requires browser testing with Eve Vault
+- [ ] Ranked flow works end-to-end on deployed URL — requires sponsor secret + funding
 - [ ] In-game mode detected when loaded in 787×1198 viewport / `?mode=ingame`
+- [x] Sponsor endpoint reachable — returns 503 "not configured" (expected until secret set)
+- [ ] Sponsor endpoint functional — returns valid sponsored tx after secret set + funding
 
 ---
 
@@ -512,8 +577,8 @@ These items are explicitly **not part of this phase** and should wait until the 
 
 | Item | Reason for deferral | When to revisit |
 |------|-------------------|-----------------|
-| **In-game wallet/identity integration** | CEF has no Sui wallet; in-game is free-play only per architecture | Only if EVE Frontier adds CEF wallet injection |
-| **Sponsored transactions** | Gas handling is a wallet/runtime concern, not a Move contract concern; Phase 1 contracts are agnostic to gas funding | Revisit during frontend wiring if wallet supports sponsorship, or post-hackathon |
+| ~~**In-game wallet/identity integration**~~ | ✅ Resolved — EVE Frontier Client Wallet is available in CEF; ranked mode now unlocks in-game when wallet is connected | N/A |
+| **Sponsored transactions** | Investigated. `evefrontier:sponsoredTransaction` is assembly-scoped (requires `assembly`, `assemblyType`, `txAction` params routed to EVE Frontier API). Cannot sponsor game contract calls. Sui-native gas sponsorship client code implemented (`useGameTransaction` hook, `sponsorship.ts`) — sends TransactionKind to a sponsor service that co-signs as gas owner. Requires deploying a lightweight sponsor service. | Deploy sponsor service + set `VITE_SPONSOR_SERVICE_URL` to activate. No Move contract changes needed. |
 | **Game hash computation** | `ScoreSubmission.gameHash` field exists but isn't validated on-chain | Post-hackathon (requires on-chain replay or ZK proof) |
 | **Replay/verification system** | Seeds are stored, but replay is not MVP | Post-hackathon |
 | **Local practice leaderboard (Phase 6 from MVP plan)** | The ranked on-chain leaderboard is the real leaderboard; local leaderboard adds no hackathon value | Deprioritized indefinitely — ranked leaderboard replaces it |
@@ -545,7 +610,7 @@ These items are explicitly **not part of this phase** and should wait until the 
 | Deployer wallet lacks testnet EVE for testing | Very Low — operator has validation wallet | ✅ Operator-funded Utopia test wallet with EVE is available. If additional EVE is needed, acquire via Utopia gameplay or peer transfer. |
 | Shared object contention on Leaderboard | Very Low | Top-10 vector is small; hackathon scale is negligible |
 | Cloudflare DNS for `flappyfrontier.com` not configured in time | Low | Use `*.pages.dev` preview URL; custom domain is cosmetic |
-| CEF Chrome 122 compatibility with wallet-standard | Very Low — in-game is free-play only | No wallet operations in CEF; only practice mode + read-only leaderboard |
+| CEF Chrome 122 compatibility with wallet-standard | ✅ Confirmed working — EVE Frontier Client Wallet discovered and usable in CEF | Ranked mode available in-game when wallet connected |
 
 ### Blockers (resolve before Phase 1)
 
@@ -576,46 +641,66 @@ Stillness is the production server. **Do not publish contracts to Stillness duri
 
 ## 10. Recommended Next Implementation Prompt Scope
 
-### First implementation prompt: Phase 1 — Move Contracts
+### ~~First implementation prompt: Phase 1 — Move Contracts~~ ✅ COMPLETE
 
-**Scope:** Create complete Move package with unit tests.  
-**Files to create:**
-- `contracts/flappy_frontier/Move.toml`
-- `contracts/flappy_frontier/sources/config.move`
-- `contracts/flappy_frontier/sources/leaderboard.move`
-- `contracts/flappy_frontier/sources/treasury.move`
-- `contracts/flappy_frontier/sources/game.move`
+Phase 1 contracts implemented, tested (23/23 pass), committed on `feat/phase1-move-contracts`.
 
-**Prompt guidance:**
-> Implement the Flappy Frontier Move contracts per the chain integration plan (docs/plans/flappy-frontier-chain-integration-plan.md §5 Phase 1). The product vision (docs/strategy/flappy-frontier-product-vision.md §5) defines the data structures and functions. Use a generic coin type `Treasury<phantom T>` with `Balance<T>` so that the caller specifies `<EVE::EVE>` at the call site — no compile-time dependency on the `assets` package. The entry fee default is 100 EVE (= 100_000_000_000 base units, 9 decimals), but this must be configurable via `Config`. Include unit tests for all public functions using `sui::sui::SUI` as the test coin type (since the EVE type isn't available in the test environment, but the generic approach means any `Coin<T>` works). Use 10-minute epoch duration as default for testing. Follow Move conventions from `.github/instructions/move.instructions.md`. Verify: `sui move build` and `sui move test` must pass.
->
-> CONTRACT CHANGE OK
+### ~~Second implementation prompt: Phase 2 — Publish to Testnet~~ ✅ COMPLETE
 
-**Success criteria:**
-- `sui move build --path contracts/flappy_frontier` passes
-- `sui move test --path contracts/flappy_frontier` passes (5+ test cases)
-- All public functions match product vision signatures
-- Events defined for indexing: `RunStarted`, `ScoreSubmitted`, `PayoutExecuted`, `LeaderboardReset`
+Package published to Sui testnet. Treasury<EVE> initialized. All object IDs recorded in `frontend/src/lib/contractConfig.ts`. See §5 Phase 2 section for results.
 
-### Second implementation prompt: Phase 2 — Publish + Phase 3 — Frontend Wiring
+### Next implementation prompt: Phase 3 — Frontend Wallet + Chain Wiring ✅ COMPLETE
 
-Once contracts compile and tests pass, the next prompt covers publishing to testnet and wiring the frontend. This will be a larger prompt touching ~10 frontend files.
+**Status:** ✅ Complete (2026-03-15)
 
-### Third implementation prompt: Phase 4 + 5 — Deploy + Validate
+**Scope:** Wire the frontend to the testnet contracts for ranked mode.  
+**Branch:** Continued on `feat/phase1-move-contracts`.
 
-Cloudflare deployment and full lifecycle validation.
+#### What was implemented
+
+| File | Change | Notes |
+|------|--------|-------|
+| `frontend/package.json` | Added `@mysten/sui`, `@mysten/dapp-kit`, `@mysten/wallet-standard`, `@tanstack/react-query` | `@evefrontier/dapp-kit` deferred — EVE type resolved statically |
+| `frontend/src/app/Providers.tsx` | **NEW** — `QueryClientProvider` → `SuiClientProvider` → `WalletProvider` | `createNetworkConfig` with testnet URL |
+| `frontend/src/app/App.tsx` | Wrapped `GamePage` in `<Providers>` | |
+| `frontend/src/features/auth/hooks/usePlayerIdentity.ts` | Rewired to real wallet hooks (`useCurrentAccount`, `useConnectWallet`, `useDisconnectWallet`) | `canPlayRanked = !!account?.address` (in-game wallet support confirmed; environment no longer gates ranked) |
+| `frontend/src/lib/seedProvider.ts` | Added `buildStartRunTransaction()` and `parseSeedFromEvents()` | Fetches EVE coins, merges if needed, calls `game::start_run<EVE>` |
+| `frontend/src/features/score/services/scoreService.ts` | Added `buildSubmitScoreTransaction()` | Builds PTB for `game::submit_score<EVE>()` |
+| `frontend/src/features/score/components/LeaderboardPanel.tsx` | **NEW** — On-chain leaderboard panel | Reads Leaderboard + Treasury, shows top 10, prize pool, epoch countdown |
+| `frontend/src/features/game/components/ModeSelector.tsx` | Dynamic ranked enable/disable with `canPlayRanked` + `entryFeeDisplay` props | |
+| `frontend/src/features/game/components/GameOverScreen.tsx` | Added ranked score submission UI (submit button, tx digest, errors) | |
+| `frontend/src/features/game/components/StartScreen.tsx` | Added wallet connect/disconnect, leaderboard button, entry fee display | |
+| `frontend/src/features/game/components/GameCanvas.tsx` | Added `externalSeed` prop for chain-seeded ranked runs | |
+| `frontend/src/game/gameLoop.ts` | `createInitialState` + `start` + `restart` accept optional `externalSeed` | Falls back to `getLocalSeed()` for practice |
+| `frontend/src/features/game/components/GamePage.tsx` | Major rewrite — full ranked orchestrator | Chain seed flow, entry fee, score submission, leaderboard, error handling |
+
+#### Verification results
+
+- ✅ `npx tsc --noEmit` passes (zero errors)
+- ✅ `npm run build` succeeds (Vite build completes)
+- ⬜ Manual wallet + ranked flow validation — requires human testing with EVE Vault wallet and testnet EVE tokens
+
+#### Deviations from plan
+
+- **`@evefrontier/dapp-kit` not installed** — The EVE coin type is resolved statically from `contractConfig.ts`. `getEveCoinType()` utility is not needed for Utopia since the type string is already known. Will add if needed for Stillness dual-deployment.
+- **`@mysten/dapp-kit` used instead of `@mysten/dapp-kit-react`** — The npm package is `@mysten/dapp-kit` (v1.0.3), not `@mysten/dapp-kit-react` as the plan originally stated.
+- **`ConnectModal` used instead of inline `connect()`** — dapp-kit v1.x uses a modal-based wallet selection flow rather than direct `connect()` calls.
+
+### Fourth implementation prompt: Phase 4 + 5 — Deploy + Validate
+
+Cloudflare deployment and full lifecycle validation (including short-epoch payout test).
 
 ---
 
 ## 11. Phase Summary Table
 
-| Phase | Title | Depends on | Risk | Est. files | Key decision |
-|-------|-------|-----------|------|------------|-------------|
-| **1** | Move Contracts | Deployer wallet, EVE type string | High | 5 new | Generic `Treasury<phantom T>` — `Coin<EVE>` at call site |
-| **2** | Publish to Testnet | Phase 1 | Medium | 1 new (contractConfig.ts) | Record object IDs, store EVE type |
-| **3** | Frontend Wallet + Chain Wiring | Phase 2 | High | ~10 modified | `@mysten/dapp-kit-react` + `@evefrontier/dapp-kit` for EVE type resolution |
-| **4** | Cloudflare Deployment | Phase 3 | Low | 1–2 config | After localhost validation, before in-game test |
-| **5** | Utopia Validation + Payout | Phase 3–4 | Medium | 0 (testing only) | 10-min epoch for manual observation |
+| Phase | Title | Depends on | Risk | Est. files | Status |
+|-------|-------|-----------|------|------------|--------|
+| **1** | Move Contracts | Deployer wallet, EVE type string | High | 5 new | ✅ Complete |
+| **2** | Publish to Testnet | Phase 1 | Medium | 1 new (contractConfig.ts) | ✅ Complete |
+| **3** | Frontend Wallet + Chain Wiring | Phase 2 | High | ~13 modified/new | ✅ Complete |
+| **4** | Cloudflare Deployment | Phase 3 | Low | 1–2 config | 🔜 Next |
+| **5** | Utopia Validation + Payout | Phase 3–4 | Medium | 0 (testing only) | Not started |
 
 ---
 

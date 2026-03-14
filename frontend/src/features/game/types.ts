@@ -27,6 +27,6 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     requiresEntryFee: true,
     leaderboardEligible: true,
     label: 'Ranked',
-    description: 'Compete for weekly prizes — coming soon',
+    description: 'Compete for weekly EVE prizes',
   },
 };

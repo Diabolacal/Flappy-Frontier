@@ -5,6 +5,185 @@
 Newest entries first. See `docs/operations/DECISIONS_TEMPLATE.md` for format.
 
 ---
+## 2026-03-13 — Fix sponsor service SuiJsonRpcClient constructor
+
+- **Goal:** Fix silent sponsor failure — worker was constructing `SuiJsonRpcClient(urlString)` instead of `SuiJsonRpcClient({ url: urlString })`. This caused "Invalid URL: undefined" on every request, which the frontend silently caught and fell back to player-paid gas.
+- **Files:** `workers/sponsor-service/src/index.ts`
+- **Diff:** 1 line changed
+- **Risk:** Low (fixes existing broken path, no behavior change for fallback)
+- **Gates:** worker-deploy ✅ sponsor-endpoint ✅ (returns 200 with valid dual-sig data)
+- **Root cause:** SDK v2's `SuiJsonRpcClient` takes an options object `{ url }`, not a bare URL string. The constructor accepts anything without throwing, but the internal HTTP transport receives `undefined` for the URL, which only fails lazily when `tx.build()` makes its first RPC call.
+- **Follow-ups:** Fund sponsor wallet with more SUI for sustained testing; verify end-to-end in browser.
+
+---
+## 2026-03-13 — Cloudflare deployment + gas sponsor service
+
+- **Goal:** Deploy frontend to Cloudflare Pages and implement/deploy a lightweight gas sponsor service as a Cloudflare Worker for ranked mode transactions.
+- **Files:** `workers/sponsor-service/` (new — `package.json`, `tsconfig.json`, `wrangler.toml`, `src/index.ts`), `frontend/wrangler.jsonc` (new), `frontend/.env.example` (new), `flappy-frontier-chain-integration-plan.md`, `decision-log.md`
+- **Diff:** ~170 LoC added (worker), ~15 LoC config
+- **Risk:** Medium (new deployment surface, sponsor wallet key management)
+- **Gates:** typecheck ✅ build ✅ worker-build ✅ worker-deploy ✅ pages-deploy ✅ smoke ⬜ (pending sponsor secret + funding)
+- **Architecture:**
+  - Frontend: Cloudflare Pages project `flappy-frontier` → `flappy-frontier.pages.dev`
+  - Sponsor: Cloudflare Worker `flappy-frontier-sponsor` → `flappy-frontier-sponsor.michael-davis-home.workers.dev`
+  - API: `POST /sponsor { txKindB64, sender } → { txB64, sponsorSignature }` (Sui-native dual-sig)
+  - Sponsor wallet: dedicated Ed25519 keypair `0x0d6fa6c31dba20dd18a828c08c46ca20f81d96bf24180fb64dfdceb474aca01f`
+  - Secret handling: bech32 private key stored only as Cloudflare Worker secret (`SPONSOR_PRIVATE_KEY`)
+- **Pending manual steps:** (1) `wrangler secret put SPONSOR_PRIVATE_KEY`, (2) fund sponsor wallet with testnet SUI, (3) custom domain CNAME for `flappyfrontier.com`
+- **Follow-ups:** Set secret, fund wallet, end-to-end test sponsored ranked mode, custom domain
+
+---
+## 2026-03-13 — Sponsored transaction investigation + Sui-native gas sponsorship architecture
+
+- **Goal:** Investigate `evefrontier:sponsoredTransaction` capability visible on both SSU and Eve Vault wallets. Determine if players can avoid needing SUI for gas. Implement sponsored path if feasible.
+- **Files:** `sponsorship.ts` (new), `useGameTransaction.ts` (new), `GamePage.tsx`, `LeaderboardPanel.tsx`, `flappy-frontier-chain-integration-plan.md`, `decision-log.md`
+- **Diff:** ~175 LoC added (2 new files), ~50 LoC changed across 2 existing components
+- **Risk:** Medium (ranked transaction paths, but all existing behavior preserved as fallback)
+- **Gates:** typecheck ✅ build ✅ move-build N/A move-test N/A smoke ⬜ (human retest pending)
+- **Key findings:**
+  - `evefrontier:sponsoredTransaction` is **assembly-scoped** — requires `assembly` (object ID), `assemblyType`, `txAction` params. Routed to EVE Frontier API at `https://api.{tier}.tech.evefrontier.com/transactions/sponsored/{assemblyType}/{action}`. The background handler validates assembly/assemblyType as required fields.
+  - The capability CANNOT be used for game contract calls (`start_run`, `submit_score`, `trigger_payout`) — these are not assembly operations.
+  - Both wallets (SSU: "EVE Frontier Client Wallet", browser: "Eve Vault") expose this capability identically.
+- **Implementation:**
+  - `sponsorship.ts`: Capability detection, sponsor service client (Sui-native dual-sig pattern), base64 helpers
+  - `useGameTransaction.ts`: Hook wrapping all ranked transaction execution. When `VITE_SPONSOR_SERVICE_URL` is configured, builds TransactionKind → sends to sponsor service → player signs sponsored tx → dual-sig execution. Falls back to standard `signAndExecuteTransaction` otherwise.
+  - `GamePage.tsx` + `LeaderboardPanel.tsx`: All ranked tx paths now use `useGameTransaction`. Gas messaging is sponsorship-aware.
+- **To activate sponsorship:** Deploy a lightweight sponsor service implementing: `POST /sponsor { txKindB64, sender } → { txB64, sponsorSignature }`. Set `VITE_SPONSOR_SERVICE_URL` env var. No Move contract changes needed.
+- **Fallback behavior:** Without sponsor service, all transactions use standard player-paid gas (current behavior, unchanged).
+- **Follow-ups:** Deploy sponsor service (Cloudflare Worker or similar), fund sponsor wallet with testnet SUI, human retest in SSU + browser
+
+---
+## 2026-03-13 — SSU wallet UX: runtime detection, auto-connect, direct connect fallback
+
+- **Goal:** Fix in-game wallet UX using authoritative EFMap Probe runtime evidence. The SSU injects exactly 1 Sui wallet ("EVE Frontier Client Wallet") with connect/sign/execute + sponsored tx capabilities. Prior auto-connect failed because it depended on viewport detection (`isInGameBrowser`), which is fragile. The generic ConnectModal chooser was unnecessary friction in SSU.
+- **Files:** `useSSUWallet.ts` (new), `App.tsx`, `GamePage.tsx`, `StartScreen.tsx`, `Providers.tsx`, `decision-log.md`, `flappy-frontier-chain-integration-plan.md`
+- **Diff:** ~90 LoC added (new hook), ~30 LoC changed across 4 existing files
+- **Risk:** Medium (wallet connection flow, auth hooks, UI flow)
+- **Gates:** typecheck ✅ build ✅ smoke ⬜ (requires human in-game retest)
+- **Root cause of prior auto-connect failure:** `useInGameAutoConnect` depended on `isInGameBrowser` (viewport-based ±5px match) as its first gate. If SSU viewport didn't match 787×1198 exactly, the entire hook was a no-op. Viewport is a fragile heuristic; wallet runtime evidence is the authoritative signal.
+- **Key changes:**
+  - New `useSSUWallet` hook: detects SSU by wallet runtime evidence (presence of "EVE Frontier Client Wallet" in `useWallets()`), not viewport. Auto-connects when dapp-kit autoConnect passes with no stored wallet. Returns `{isSSU, status, connectDirectly}`.
+  - `StartScreen`: in SSU, shows "Use Game Client Wallet" direct-connect button (no generic chooser). Shows tiny status indicator (`SSU: detecting/auto-connecting/ready/connected`).
+  - `GamePage`: in SSU, `handleConnect` calls `connectDirectly()` instead of opening ConnectModal.
+  - `Providers.tsx`: removed viewport dependency for `preferredWallets`. ConnectModal only appears in browser mode; EVE Vault listed first.
+  - Viewport detection (`environment.ts`) preserved for layout scaling only — unchanged.
+  - `useInGameAutoConnect.ts` is now dead code (replaced by `useSSUWallet`). Will be removed in follow-up.
+  - SSU wallet reports `evefrontier:sponsoredTransaction` capability — noted for future implementation.
+- **Browser behavior:** Fully preserved. `isSSU = false` in browser → generic "Connect Wallet" → ConnectModal → EVE Vault + any other wallets. No regression.
+- **Follow-ups:** Human retest SSU (fresh state), remove dead `useInGameAutoConnect.ts`, investigate sponsored transactions
+
+---
+## 2026-03-13 — Fix in-game auto-connect: remove wallet count guard + add diagnostics
+
+- **Goal:** Auto-connect hook from prior entry didn't fire in real SSU runtime. Diagnosed: the `wallets.length !== 1` guard was too strict — the SSU likely registers multiple wallet entries (e.g. duplicates or dev wallets). Manual connect worked, confirming the wallet itself is fine.
+- **Files:** `useInGameAutoConnect.ts`
+- **Diff:** ~30 LoC changed (rewrite of guard logic + diagnostic logging)
+- **Risk:** Low (in-game-only, no-op in browser, single file change)
+- **Gates:** typecheck ✅ build ✅ smoke ⬜ (requires human in-game retest with console open)
+- **Key changes:**
+  - Removed `wallets.length !== 1` guard — was blocking auto-connect when SSU registers >1 wallet
+  - Now uses `wallets.find(w => w.name === EVE_FRONTIER_WALLET)` to locate target wallet by name regardless of total count
+  - Added comprehensive `console.log('[InGameAutoConnect]')` diagnostics at every decision point — logs viewport, wallet count, wallet names, autoConnect status, connection state
+  - Diagnostics are temporary — will be removed after successful in-game validation
+- **Follow-ups:** Human retest in SSU with F12 console open; capture `[InGameAutoConnect]` logs; confirm auto-connect fires; then strip diagnostic logging
+
+---
+## 2026-03-13 — In-game auto-connect for EVE Frontier Client Wallet
+
+- **Goal:** Eliminate the manual "Connect Wallet" click in the in-game browser when only the EVE Frontier Client Wallet is present. dapp-kit's built-in `autoConnect` only reconnects from localStorage (useless on first visit).
+- **Files:** `useInGameAutoConnect.ts` (new), `App.tsx`
+- **Diff:** ~50 LoC added (new hook), ~10 LoC changed (App.tsx wrapper)
+- **Risk:** Low (in-game-only, no-op in browser, strongly guarded)
+- **Gates:** typecheck ✅ build ✅ smoke ⬜ (requires human in-game retest)
+- **Key changes:**
+  - New `useInGameAutoConnect` hook: after dapp-kit autoConnect completes with no stored wallet, if in-game + exactly 1 wallet + it's EVE Frontier Client Wallet → programmatically connect
+  - `App.tsx` restructured to add `AppContent` wrapper inside Providers tree so hook can use wallet context
+  - Browser mode: hook is a complete no-op (first guard is `!isInGameBrowser`)
+  - On second+ visits, dapp-kit's built-in autoConnect handles reconnection via localStorage (this hook exits early)
+- **Follow-ups:** Human retest in-game first load — wallet should auto-connect, ranked should unlock without clicks
+
+---
+## 2026-03-13 — Fix in-game wallet ranked gating (EVE Frontier Client Wallet support)
+
+- **Goal:** Ranked mode stays locked in the in-game browser even after the EVE Frontier Client Wallet connects successfully. Root cause: `canPlayRanked` in `usePlayerIdentity.ts` included a hard `!isInGameBrowser` gate — an assumption from early planning that the in-game CEF browser has no wallet. Real testing proved the EVE Frontier Client Wallet IS available and functional in-game.
+- **Files:** `usePlayerIdentity.ts`, `Providers.tsx`, `flappy-frontier-chain-integration-plan.md`, `decision-log.md`
+- **Diff:** ~15 LoC changed across 2 source files, ~10 lines updated in docs
+- **Risk:** Medium (wallet gating logic + provider config)
+- **Gates:** typecheck ✅ build ✅ smoke ⬜ (requires human in-game retest)
+- **Key changes:**
+  - Removed `&& !isInGameBrowser` from `canPlayRanked` — ranked eligibility is now purely `!!account?.address`
+  - Added `preferredWallets` to `WalletProvider` — prioritizes EVE Frontier Client Wallet in-game, EVE Vault in browser
+  - `isInGameBrowser` retained for layout/scaling only (not ranked gating)
+  - Chain integration plan updated: in-game CEF now listed as wallet-capable with Practice + Ranked support
+  - Stale assumptions corrected throughout plan doc
+- **Follow-ups:** Human retest ranked flow in-game browser; verify EVE Frontier Client Wallet auto-preference
+
+---
+## 2026-03-15 — Ranked lifecycle UX fixes (payout trigger, auto-submit, messaging)
+
+- **Goal:** Fix ranked-mode lifecycle frictions surfaced during manual testnet testing
+- **Files:** `LeaderboardPanel.tsx`, `GameOverScreen.tsx`, `GamePage.tsx`, `scoreService.ts`
+- **Diff:** ~100 LoC changed across 4 files
+- **Risk:** Medium (game over flow + new on-chain payout trigger)
+- **Gates:** typecheck ✅ build ✅ smoke ⬜ (requires human wallet re-test)
+- **Key changes:**
+  - Added `buildTriggerPayoutTransaction()` in `scoreService.ts` — calls `game::trigger_payout<EVE>()`
+  - `LeaderboardPanel` now shows "Trigger Epoch Payout" button when epoch expired + prize pool > 0
+  - Score submission auto-triggers on ranked game over (no manual Submit button needed)
+  - `GameOverScreen` shows submission progress/success/failure with retry on error
+  - Error messages now distinguish EVE balance vs SUI gas vs wallet rejection
+  - Payout trigger preserves trustless model — public-callable, explained in UI copy
+- **Follow-ups:** Human re-test full ranked lifecycle, then Phase 4 Cloudflare deployment
+
+---
+## 2026-03-15 — Phase 3 complete: Frontend wired to Sui testnet contracts
+
+- **Goal:** Wire frontend to live testnet contracts so ranked mode works end-to-end on localhost
+- **Files:** 13 files modified/created — `Providers.tsx` (new), `LeaderboardPanel.tsx` (new), `GamePage.tsx` (major rewrite), `usePlayerIdentity.ts`, `seedProvider.ts`, `scoreService.ts`, `ModeSelector.tsx`, `GameOverScreen.tsx`, `StartScreen.tsx`, `GameCanvas.tsx`, `gameLoop.ts`, `App.tsx`, `package.json`
+- **Diff:** ~800 LoC added/modified across 13 files
+- **Risk:** High (wallet SDK, PTB construction, async game flow)
+- **Gates:** typecheck ✅ build ✅ smoke ⬜ (requires human wallet test)
+- **Key facts:**
+  - SDK: `@mysten/dapp-kit` v1.0.3 (not `dapp-kit-react` as plan originally named)
+  - `@evefrontier/dapp-kit` deferred — EVE type resolved statically from contractConfig
+  - `ConnectModal` used for wallet selection (dapp-kit v1.x modal pattern)
+  - Ranked flow: wallet connect → pay EVE entry fee → chain seed → play → submit score
+  - Practice mode unchanged (no wallet needed, local seed)
+  - Leaderboard reads from chain: top 10, prize pool, epoch countdown
+- **Branch:** `feat/phase1-move-contracts`
+- **Follow-ups:** Manual wallet test with EVE Vault, Phase 4 Cloudflare deployment
+
+---
+## 2026-03-14 — Phase 2 complete: Move package published to Sui testnet
+
+- **Goal:** Publish Phase 1 Move contracts to Sui testnet, initialize all shared objects, record IDs for frontend
+- **Files:** `frontend/src/lib/contractConfig.ts` (new), `docs/plans/flappy-frontier-chain-integration-plan.md` (updated)
+- **Diff:** +65 LoC new, ~80 LoC plan updates
+- **Risk:** Medium (testnet publish + on-chain init)
+- **Gates:** move-build ✅ typecheck ✅ objects-verified ✅ admin-smoke ✅
+- **Key facts:**
+  - Package ID: `0xa23c94bd1ec5dc6516573fccd3af0f756057fb83170bc4d0d37082007ee49867`
+  - Publish created AdminCap + GameConfig + Leaderboard in `config::init()`
+  - Treasury<EVE> required explicit post-publish `game::init_treasury<EVE>()` call (generic T cannot bind at publish time)
+  - All 5 objects verified on-chain: correct types, correct ownership (shared vs owned), correct default values
+  - Admin mutation smoke test passed (`set_entry_fee` via AdminCap)
+  - Full `start_run<EVE>` smoke test deferred — wallet has no EVE tokens; will test in Phase 3
+- **Branch:** `feat/phase1-move-contracts`
+- **Follow-ups:** Phase 3 (frontend wallet + chain wiring), acquire EVE tokens for end-to-end test
+
+---
+## 2026-03-14 – Phase 1 Move contracts implemented
+
+- **Goal:** Implement all Phase 1 Move contracts per chain integration plan
+- **Files:** `contracts/flappy_frontier/sources/{config,treasury,leaderboard,game}.move`, `contracts/flappy_frontier/tests/{leaderboard_tests,treasury_tests}.move`, `contracts/flappy_frontier/{Move.toml,README.md}`
+- **Diff:** +1273 LoC (9 new files)
+- **Risk:** High (Move contracts, treasury logic, leaderboard logic)
+- **Gates:** move-build ✅ move-test ✅ (23/23 pass)
+- **Key decisions:** Generic `Treasury<phantom T>` (no EVE compile dep), `public(package)` visibility for all mutating fns, AdminCap scoped to GameConfig params only (no treasury access), security audit found & fixed critical `distribute_payout` public visibility drain vector
+- **Branch:** `feat/phase1-move-contracts` (commit `0107254`)
+- **Follow-ups:** Phase 2 (testnet publish + record object IDs), Phase 3 (frontend wallet wiring)
+
+---
 
 ## 2026-03-13 – Trustless treasury custody (hard constraint)
 

@@ -1,3 +1,5 @@
+import { Transaction } from '@mysten/sui/transactions';
+import { CONTRACT_CONFIG } from '@/lib/contractConfig';
 import type { ScoreSubmission, SubmitResult } from '../types';
 
 const SCORES_KEY = 'flappy-frontier-scores';
@@ -9,7 +11,55 @@ interface StoredScore {
   timestamp: number;
 }
 
+/**
+ * Build a PTB for `game::submit_score<EVE>()`.
+ * Caller signs and executes.
+ */
+export function buildSubmitScoreTransaction(
+  score: number,
+  runSeed: string,
+): Transaction {
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: `${CONTRACT_CONFIG.packageId}::game::submit_score`,
+    typeArguments: [CONTRACT_CONFIG.eveCoinType],
+    arguments: [
+      tx.object(CONTRACT_CONFIG.leaderboardId),
+      tx.object(CONTRACT_CONFIG.treasuryId),
+      tx.pure.u64(score),
+      tx.pure.u256(BigInt(runSeed)),
+      tx.object(CONTRACT_CONFIG.clockObjectId),
+    ],
+  });
+
+  return tx;
+}
+
+/**
+ * Build a PTB for `game::trigger_payout<EVE>()`.
+ * Public-callable by anyone once the epoch has expired.
+ * Distributes treasury funds to leaderboard winners and resets the epoch.
+ */
+export function buildTriggerPayoutTransaction(): Transaction {
+  const tx = new Transaction();
+
+  tx.moveCall({
+    target: `${CONTRACT_CONFIG.packageId}::game::trigger_payout`,
+    typeArguments: [CONTRACT_CONFIG.eveCoinType],
+    arguments: [
+      tx.object(CONTRACT_CONFIG.treasuryId),
+      tx.object(CONTRACT_CONFIG.leaderboardId),
+      tx.object(CONTRACT_CONFIG.gameConfigId),
+      tx.object(CONTRACT_CONFIG.clockObjectId),
+    ],
+  });
+
+  return tx;
+}
+
 export async function submitScore(submission: ScoreSubmission): Promise<SubmitResult> {
+  // Always save locally
   try {
     const scores = getLocalScores();
     scores.push({

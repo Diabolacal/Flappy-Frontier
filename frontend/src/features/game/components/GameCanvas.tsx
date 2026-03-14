@@ -7,6 +7,8 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from '@/game/constants';
 interface GameCanvasProps {
   mode: GameMode;
   isActive: boolean;
+  externalSeed?: number;
+  fillParent?: boolean;
   onScoreChange: (score: number) => void;
   onGameOver: (score: number, bestScore: number) => void;
   onPhaseChange: (phase: GamePhase) => void;
@@ -16,6 +18,8 @@ interface GameCanvasProps {
 export function GameCanvas({
   mode,
   isActive,
+  externalSeed,
+  fillParent = false,
   onScoreChange,
   onGameOver,
   onPhaseChange,
@@ -45,7 +49,7 @@ export function GameCanvas({
   useEffect(() => {
     if (isActive) {
       initLoop();
-      loopRef.current?.start(mode);
+      loopRef.current?.start(mode, externalSeed);
     }
 
     return () => {
@@ -66,7 +70,10 @@ export function GameCanvas({
       width={CANVAS_WIDTH}
       height={CANVAS_HEIGHT}
       className="block"
-      style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+      style={fillParent
+        ? { width: '100%', height: '100%' }
+        : { width: CANVAS_WIDTH, height: CANVAS_HEIGHT }
+      }
     />
   );
 }

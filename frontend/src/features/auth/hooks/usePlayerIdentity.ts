@@ -1,18 +1,25 @@
-import { useState } from 'react';
-import { ANONYMOUS_PLAYER } from '../types';
-import type { PlayerIdentity } from '../types';
+import { useCurrentAccount, useConnectWallet, useDisconnectWallet } from '@mysten/dapp-kit';
 import { detectEnvironment } from '@/lib/environment';
+import type { PlayerIdentity } from '../types';
 
 export function usePlayerIdentity() {
-  const [player] = useState<PlayerIdentity>(() => ({
-    ...ANONYMOUS_PLAYER,
-    isInGameBrowser: detectEnvironment().isInGameBrowser,
-  }));
+  const account = useCurrentAccount();
+  const { mutate: connectWallet } = useConnectWallet();
+  const { mutate: disconnectWallet } = useDisconnectWallet();
+  const { isInGameBrowser } = detectEnvironment();
+
+  const player: PlayerIdentity = {
+    address: account?.address ?? null,
+    displayName: account?.address
+      ? `${account.address.slice(0, 6)}…${account.address.slice(-4)}`
+      : 'Pilot',
+    isInGameBrowser,
+  };
 
   return {
     player,
-    canPlayRanked: false,
-    connect: () => {},
-    disconnect: () => {},
+    canPlayRanked: !!account?.address,
+    connect: connectWallet,
+    disconnect: disconnectWallet,
   };
 }

@@ -6,7 +6,6 @@ import {
   DT_CAP,
   BG_SCROLL_SPEED,
   JUMP_VELOCITY,
-  MAX_GAME_TIME,
   THRUSTER_PULSE_HZ,
 } from './constants';
 import { createRNG } from '@/lib/rng';
@@ -21,8 +20,8 @@ import { createInputHandler } from './input';
 import { getDifficulty } from './progression';
 import { playFlap, playCrash, ensureAudioResumed } from './audio';
 
-function createInitialState(mode: GameMode, bestScore: number): GameState {
-  const { seed } = getLocalSeed();
+function createInitialState(mode: GameMode, bestScore: number, externalSeed?: number): GameState {
+  const seed = externalSeed ?? getLocalSeed().seed;
   const rng = createRNG(seed);
 
   return {
@@ -45,9 +44,9 @@ function createInitialState(mode: GameMode, bestScore: number): GameState {
 }
 
 export interface GameLoopHandle {
-  start: (mode: GameMode) => void;
+  start: (mode: GameMode, externalSeed?: number) => void;
   stop: () => void;
-  restart: (mode: GameMode) => void;
+  restart: (mode: GameMode, externalSeed?: number) => void;
 }
 
 export function startGameLoop(
@@ -145,12 +144,6 @@ export function startGameLoop(
       }
 
       state.elapsed += dt;
-
-      // Time limit
-      if (state.elapsed >= MAX_GAME_TIME) {
-        state.phase = 'dying';
-        callbacks.onPhaseChange('dying');
-      }
       return;
     }
 
@@ -181,8 +174,8 @@ export function startGameLoop(
   }
 
   const handle: GameLoopHandle = {
-    start(mode: GameMode) {
-      state = createInitialState(mode, loadBestScore());
+    start(mode: GameMode, externalSeed?: number) {
+      state = createInitialState(mode, loadBestScore(), externalSeed);
       lastTime = 0;
       running = true;
       callbacks.onPhaseChange('ready');
@@ -193,8 +186,8 @@ export function startGameLoop(
       cancelAnimationFrame(rafId);
       cleanupInput();
     },
-    restart(mode: GameMode) {
-      state = createInitialState(mode, loadBestScore());
+    restart(mode: GameMode, externalSeed?: number) {
+      state = createInitialState(mode, loadBestScore(), externalSeed);
       lastTime = 0;
       callbacks.onScoreChange(0);
       callbacks.onPhaseChange('ready');

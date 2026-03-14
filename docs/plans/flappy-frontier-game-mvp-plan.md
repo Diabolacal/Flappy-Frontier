@@ -283,11 +283,7 @@ Hitbox forgiveness (shrunk ~15–20% on each side) is essential — it makes nea
 
 ### Speed / Difficulty
 
-Constant scroll speed throughout. No acceleration, no new obstacle types. Difficulty comes from random gap positions and player fatigue. This is faithful to the original and drives the "one more try" loop.
-
-### Time Limit
-
-120-second maximum run time (per product vision). At 150 px/s scroll and 280 px spacing, theoretical max score is ~64 pipes. Timer displayed subtly (or not at all — can be added later).
+Score-based progressive difficulty controlled by `progression.ts`. Gap size shrinks (160→115 px over 30 pts), scroll speed increases (140→185 px/s over 35 pts), gap Y-range widens, and adjacent-gap deltas grow. After the authored ceiling (score 35), an endless speed ramp adds +12 px/s every 5 points up to a hard cap of 340 px/s. This replaces a hard time limit — long runs end naturally as speed becomes unmanageable.
 
 ---
 
@@ -306,7 +302,7 @@ Constant scroll speed throughout. No acceleration, no new obstacle types. Diffic
 | requestAnimationFrame | Supported | capabilities.json |
 | performance.now | Supported | capabilities.json |
 | localStorage | Read/write available | capabilities.json |
-| Sui wallet | **Not available** | capabilities.json (0 Sui wallets registered) |
+| Sui wallet | **Available** (EVE Frontier Client Wallet confirmed 2026-03-13) | Runtime testing; capabilities.json was stale |
 | createImageBitmap | Supported (Chrome 50+) | Chrome 122 |
 | Color scheme | `prefers-color-scheme: dark` | capabilities.json |
 
@@ -1161,7 +1157,7 @@ No source file exceeds 200 lines. Game logic core (`game/` directory) is ~765 li
 | 2 | SVG ship asset doesn't read well at 72×36 px | Low–Medium — looks bad | Author at 2× (192×96), shrink to verify legibility before finalizing. Keep geometry simple (15 paths max). If SVG fails, fall back to Canvas-drawn geometric ship (triangle + rectangle). | ⚠️ **Ship is visible after repair but not recognisable as Frontier vessel.** SVG transparency fixed, colors brightened, size increased to 100×50. Still needs replacement with faithful Frontier ship asset. |
 | 3 | createImageBitmap not working as expected in CEF | Low — asset loading fails | Fallback: load SVGs as `Image` objects (`img.src = url`, wait for `onload`), draw via `drawImage(img)` instead. Slightly less optimal but universally supported. | ✅ Mitigated — `assets.ts` uses `Image` → `createImageBitmap` pipeline with null return on failure. Bitmap validity check added (OffscreenCanvas pixel sampling). Graceful fallback rendering implemented for all sprites. |
 | 4 | Pipe gap randomness feels too easy or too hard | Medium — bad gameplay | `GAP_SIZE`, `GAP_DELTA_CAP`, and gap Y range are all constants. Tunable without code changes. Start with generous gaps and tighten. | ⚠️ Untested by human — constants set but need play-test tuning. |
-| 5 | Time limit (120s) doesn't integrate cleanly | Low | Optional feature — can omit from MVP. If included, a simple `elapsed > MAX_TIME` check in the update loop suffices. | ✅ Implemented — `elapsed >= MAX_GAME_TIME` check in game loop transitions to `dying` phase. |
+| 5 | Time limit (120s) doesn't integrate cleanly | Low | Optional feature — can omit from MVP. If included, a simple `elapsed > MAX_TIME` check in the update loop suffices. | ✅ Removed — replaced by endless speed ramp in `progression.ts`. No hard time cutoff. |
 | 6 | Font rendering varies between CEF and standalone | Low | System monospace fallback is always safe. Sci-fi font (Orbitron) is optional polish. | ✅ No issues observed — using system `monospace` for Canvas score text, Tailwind defaults for UI. |
 | 7 | Canvas sizing on responsive standalone viewport | Medium | Read canvas dimensions from container element. Use CSS to maintain portrait aspect ratio (max-width with aspect-ratio constraint). | ✅ Solved — CSS `transform: scale()` on game container. Fixed 787×1198 canvas, scaled to fit window. Never upscales beyond 1:1. |
 
@@ -1253,8 +1249,7 @@ const BG_SCROLL_SPEED = 20;     // px/s (slow parallax)
 const THRUSTER_PULSE_HZ = 2;    // idle pulse frequency
 const ATTITUDE_JET_DURATION = 0.15; // seconds
 
-// Timing
-const MAX_GAME_TIME = 120;      // seconds
+// Timing (no hard time limit — endless speed ramp ends runs naturally)
 const RESTART_DELAY = 500;      // ms (prevent accidental restart)
 
 // Ship pitch

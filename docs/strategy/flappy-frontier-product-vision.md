@@ -75,7 +75,7 @@ No admin. No manual payout. No maintenance. The game runs itself.
 1. **View** — Landing page shows leaderboard (top 10 with addresses, scores, timestamps) and current prize pool balance. Gameplay demo loops in background.
 2. **Authenticate** — Player connects Sui wallet (EVE Vault or any `@mysten/wallet-standard` compatible wallet in external browser).
 3. **Pay + Seed** — Player pays entry fee via `Coin<EVE>` (resolved at runtime using generic `Coin<T>`). The transaction calls `start_run()`, which draws a seed from `sui::random` and returns it. Fee goes into treasury `Balance<T>` (instantiated with EVE).
-4. **Play** — Canvas 2D game uses the on-chain seed to deterministically generate obstacles. Constrained randomness ensures no impossible layouts. Run has a maximum time limit (e.g., 120 seconds) to prevent infinite games.
+4. **Play** — Canvas 2D game uses the on-chain seed to deterministically generate obstacles. Constrained randomness ensures no impossible layouts. Progressive difficulty scaling (increasing speed, tighter gaps) naturally limits run length.
 5. **Submit** — Player calls `submit_score()` with their score and run ID. The leaderboard updates if the score qualifies for top 10.
 6. **Repeat or wait** — Play again (new fee, new seed) or wait for weekly payout.
 
@@ -147,7 +147,7 @@ public struct Treasury<phantom T> has key {
 |-----|--------|------------|
 | **Score authenticity** | Client reports score; chain cannot independently verify gameplay execution | Accepted risk — see tradeoff analysis below |
 | **Bot play** | Automated players could achieve perfect scores | Entry fee creates economic friction; not worth over-engineering for hackathon |
-| **Seed inspection** | Player could inspect seed before playing and pre-compute obstacle layout | Real-time reaction game — knowing layout provides marginal advantage (you still need to tap correctly); time limit constrains exploitation window |
+| **Seed inspection** | Player could inspect seed before playing and pre-compute obstacle layout | Real-time reaction game — knowing layout provides marginal advantage (you still need to tap correctly); escalating difficulty constrains exploitation window |
 
 ### Tradeoff: Score Verification
 
@@ -158,7 +158,7 @@ public struct Treasury<phantom T> has key {
 1. **Hackathon scope.** Building a verifiable game execution engine (ZK proof of gameplay, or on-chain game loop) is a multi-month project, not a 1–2 day sprint. Over-engineering cheat prevention would consume the entire build budget.
 2. **Economic friction.** Every submission costs an entry fee. Submitting fraudulent scores costs real tokens.
 3. **Social accountability.** Player addresses are public on the leaderboard. In a community game within EVE Frontier, reputation has weight.
-4. **Deterrence, not prevention.** The time-limited run window, verifiable seed, and public leaderboard create enough deterrence for a hackathon demo. Production hardening (replay verification, anomaly detection, challenge mechanisms) is a documented future enhancement, not an MVP requirement.
+4. **Deterrence, not prevention.** The escalating difficulty, verifiable seed, and public leaderboard create enough deterrence for a hackathon demo. Production hardening (replay verification, anomaly detection, challenge mechanisms) is a documented future enhancement, not an MVP requirement.
 
 **What we do NOT claim:** "Flappy Frontier is cheat-proof." We claim: "Every run is seeded by on-chain randomness, every score is publicly attributed, and the economic loop requires no trust in any operator."
 
@@ -190,7 +190,7 @@ Player ──[100 EVE entry fee]──► Treasury (Balance<T>)
 | **Payout split** | 50 / 30 / 20 (top 3) | Standard competitive distribution. Stored as `payout_shares` vector — trivially adjustable. |
 | **Epoch duration** | 7 days (604,800,000 ms) | Weekly reset gives enough time for competition to develop and enough freshness to sustain engagement. |
 | **Max leaderboard size** | 10 | Enough for competitive tension; small enough for a single `vector` without DF overhead. |
-| **Run time limit** | 120 seconds | Prevents infinite runs. Client enforces; chain verifies submission timestamp vs. run start. |
+| **Run time limit** | None (removed) | Replaced by endless difficulty scaling — speed ramps from 185 to 340 px/s after score 35, naturally limiting run length. |
 
 ### Treasury Safety & Custody Trust Model
 
