@@ -2,7 +2,7 @@
 
 **Retention:** Carry-forward
 
-**Date:** 2026-03-14
+**Date:** 2026-03-14 (original); 2026-03-15 (§16–§19 added: security, sponsor hardening, package versioning, deploy/config)
 **Status:** Canonical internal reference — tracked in `docs/reference/`
 **Source repo:** `Diabolacal/Flappy-Frontier`
 **Author:** Agent-generated from full repo inspection
@@ -579,6 +579,9 @@ Based on Flappy Frontier's strengths:
 | `evefrontier:sponsoredTransaction` looks generic but isn't | Wasted investigation time | Assembly-scoped requires specific params | Read source code; don't assume from capability name |
 | Wallet count guard `wallets.length !== 1` | Auto-connect failed in SSU | SSU may register multiple wallet entries | Find target wallet by name, not by count |
 | `ALLOWED_ORIGINS` env var overrides wildcard logic | Preview deploys fail CORS | wrangler.toml var takes precedence over code defaults | Keep env var and code defaults synchronized |
+| MoveCall target points to original (v1) package after upgrade | New contract code never executes; old behavior persists silently | Sui doesn't auto-resolve MoveCall to latest upgrade | After EVERY upgrade: update packageId in contractConfig.ts + ALLOWED_PACKAGE_ID in sponsor wrangler.toml |
+| Stale frontend bundle has old package ID baked in | Deployed frontend calls old contract version | `npm run build` was not re-run after config change or build cache was stale | Always grep built bundle for expected package ID before deploying |
+| CORS origin check treated as security boundary | Sponsor service sponsors arbitrary transactions from curl/scripts | CORS only stops browsers, not direct HTTP | Validate transaction contents: package/module/function allowlist |
 
 ### 12.2 False Assumptions Corrected
 
@@ -591,6 +594,9 @@ Based on Flappy Frontier's strengths:
 | "SUI is the entry fee token" | EVE is the correct token from day one (per EVE Frontier economy) |
 | "Treasury<T> can be initialized at publish time" | Generic `init()` can't bind type params — requires separate post-publish call |
 | "Epoch is calendar-aligned by default" | Epoch is rolling window (anchor + duration) — calendar alignment requires manual admin adjustment |
+| "Sui auto-resolves MoveCall targets to the latest upgrade version" | Each upgrade creates a new immutable package; MoveCall must target the exact address whose bytecode you want |
+| "Event types carry the emitting package's address" | Event types carry the original (v1) package address regardless of which upgrade version emitted them |
+| "CORS protects my sponsor service from abuse" | CORS is browser-only; direct HTTP calls bypass it entirely |
 
 ### 12.3 Things That Were Unexpectedly Difficult
 
@@ -598,6 +604,8 @@ Based on Flappy Frontier's strengths:
 2. **SVG-to-bitmap rendering.** No error signals when SVGs render transparently. Required creative debugging (OffscreenCanvas pixel sampling).
 3. **SSU wallet detection timing.** Wallets register asynchronously; a naive check on page load sees zero wallets. Required a settling mechanism.
 4. **Calendar-aligned epochs.** The on-chain epoch model is a rolling window, not aligned to calendar boundaries. Alignment requires manual admin intervention or a more complex on-chain module.
+5. **Package upgrade versioning.** Discovering that MoveCall targets don't auto-resolve took 5+ hours across multiple sessions. The feedback is silent — old code executes successfully with partial behavior.
+6. **Diagnosing deployed vs local code mismatch.** Without explicit bundle verification, it's impossible to tell from the UI whether you're running old or new code.
 
 ### 12.4 Things That Were Unexpectedly Easy
 
@@ -695,10 +703,192 @@ These patterns from Flappy Frontier are reusable as-is or with minimal adaptatio
 - [ ] Do NOT define custom fonts in Tailwind without actually importing them
 - [ ] Do NOT build a "backend" for leaderboard reads — use Sui RPC (`getObject` / `getDynamicFields`) directly
 - [ ] Do NOT add `@evefrontier/dapp-kit` unless you actually need its SDK utilities — EVE type can be hardcoded as a string
+- [ ] Do NOT assume MoveCall targets auto-resolve to the latest upgrade — they DON'T (see §17)
+- [ ] Do NOT reason from local source code about what a deployed contract does — read on-chain transactions and events (see §18)
+- [ ] Do NOT deploy without verifying the exact package ID in the built bundle — stale bundles are silent killers (see §19)
 
 ---
 
-## 16. File/Path References Inside This Repo (Useful Exemplars)
+## 16. Security Review & Sponsor Hardening Learnings (Added 2026-03-15)
+
+### 16.1 CORS/Origin Checks ≠ Authorization
+
+**CRITICAL TRAP:** CORS origin checks prevent browsers from sending cross-origin requests, but they do NOT prevent direct HTTP calls from `curl`, scripts, or server-side code. Treat CORS as a browser convenience, not a security boundary.
+
+**Flappy Frontier learning:** The sponsor service initially had NO transaction validation — it would sponsor ANY `TransactionKind` from any allowed origin. A malicious user could craft arbitrary Move calls using the sponsor wallet's gas budget.
+
+**Fix applied:** Added allowlist validation in the sponsor worker:
+- `ALLOWED_PACKAGE_ID` — only sponsors calls to our package
+- `ALLOWED_MODULE` — only `game` module
+- `ALLOWED_FUNCTIONS` — only `start_run`, `submit_score`, `trigger_payout`
+- Command whitelist — blocks `TransferObjects`, `SplitCoins`, `MergeCoins`, `Publish`, `Upgrade`
+
+**Reuse verdict:** Every sponsor service must validate the transaction contents. CORS alone is not sufficient. Add package/module/function allowlists from day one.
+
+### 16.2 RunReceipt Pattern for Score Integrity
+
+**What:** A `RunReceipt` is a `key`-only (non-transferable) object created by `start_run` and consumed (deleted) by `submit_score`. It binds a fee payment to exactly one score submission.
+
+**Why it matters:**
+- Without it: a player could pay once and submit unlimited scores
+- `key` only (no `store`) means the receipt can't be wrapped, traded, or transferred to another address
+- Receipt includes `player`, `seed`, `epoch` — `submit_score` validates all three
+
+**Security properties:**
+- One fee → one receipt → one score submission (receipt is destroyed on use)
+- Receipt is player-bound (address checked at submission)
+- Receipt is epoch-bound (can't reuse across epochs)
+- `discard_receipt()` lets players abandon a run without losing the receipt object
+
+**Source files:** `contracts/flappy_frontier/sources/game.move` (RunReceipt struct + start_run + submit_score)
+
+**Reuse verdict:** Use this pattern for any pay-to-play or one-time-use ticket system on Sui.
+
+### 16.3 Entry Fee Split Pattern — `&mut Coin<T>` Not Transfer
+
+The `start_run` function takes `payment: &mut Coin<T>` (mutable reference), not ownership. It splits the exact fee amount from the player's coin, leaving the remainder in *the same coin object*. This avoids creating orphaned coin fragments.
+
+**Contrast with bad pattern:** Transfer full coin → refund difference = creates 2 extra objects per play session (bad for gas, bad for UX).
+
+---
+
+## 17. Sui Package Upgrade & Versioning Learnings (Added 2026-03-15)
+
+### 17.1 MoveCall Targets Do NOT Auto-Resolve — THE Critical Learning
+
+**This was the single most expensive debugging lesson in the project.**
+
+**Wrong mental model (cost 5+ hours across multiple sessions):** "Sui automatically redirects MoveCall targets from the original package to the latest upgrade version."
+
+**Correct model:** Each `sui client upgrade` creates a **new immutable package object** with a new address. The original package address retains its v1 bytecode **forever**. When a PTB specifies `package: 0x355b...::game::start_run`, the Sui VM executes the bytecode stored at `0x355b...` — which is always v1.
+
+**Evidence:** After publishing v6, the frontend still called `0x355b...::game::start_run`. The on-chain transaction emitted only `RunStartedEvent` (v1 behavior). The v6 code (which also emits `RunReceiptCreatedEvent` and creates a `RunReceipt`) was never reached.
+
+**Fix:** Update `contractConfig.ts` to target the v6 package ID. The MoveCall target must be the **exact package address** whose bytecode you want to execute.
+
+**Important nuance — Event type identity:** Events emitted by upgraded packages still carry the **original** package address in their type string (e.g., `0x355b...::game::RunStartedEvent` even when emitted by v6 code). This is correct Sui behavior — the type identity is anchored to the original package. Event parsing should use `.includes('::game::RunStartedEvent')` (substring match), not exact package prefix match.
+
+**Important nuance — Shared object identity:** Shared objects (GameConfig, Treasury, Leaderboard) retain their object IDs across upgrades. Only the package address in MoveCall targets needs updating.
+
+**Reuse verdict:** After EVERY contract upgrade, update:
+1. `contractConfig.ts` → `packageId` to the new package address
+2. `workers/sponsor-service/wrangler.toml` → `ALLOWED_PACKAGE_ID` to the new package address
+3. Redeploy the sponsor service (`npx wrangler deploy`)
+4. Rebuild and redeploy the frontend
+
+### 17.2 `--force` Flag for Clean Upgrades
+
+During the debugging process, several upgrades (v2, v4) appeared to publish successfully but the on-chain bytecode didn't change behavior. Using `sui client upgrade ... --force` forces a full recompilation, bypassing any build cache.
+
+**Recommendation:** Always use `--force` for upgrades until you're confident the build cache is not stale.
+
+### 17.3 `Published.toml` Is Auto-Managed
+
+The Sui CLI auto-updates `Published.toml` on `publish` and `upgrade`. Always commit this file — it tracks the chain-id, original-id, and current `published-at` version. It's required for subsequent upgrades.
+
+### 17.4 UpgradeCap Policy Levels
+
+| Policy | Value | Meaning |
+|--------|-------|---------|
+| Compatible | 0 | Can add functions/structs, change function bodies. Most permissive. |
+| Additive | 128 | Can add new items, cannot change existing signatures. |
+| DepOnly | 192 | Can only change dependencies. |
+| Immutable | — | UpgradeCap is destroyed. No further upgrades. |
+
+For iterative hackathon development, `Compatible` (0) is correct. Before production, consider restricting to `Additive`.
+
+---
+
+## 18. Debugging From On-Chain Evidence (Added 2026-03-15)
+
+### 18.1 Always Inspect Real Transactions, Not Local Code
+
+**Learning:** Multiple debugging sessions were spent reading local Move source code and reasoning "this should emit two events." The actual on-chain behavior was different because the **deployed bytecode** was from an earlier version.
+
+**Rule:** When debugging on-chain behavior, start with the actual transaction:
+1. Get the transaction digest (from console logs, explorer, or RPC)
+2. Query `sui_getTransactionBlock` with `showEvents: true, showEffects: true, showInput: true`
+3. Check `events[]` — what events were actually emitted?
+4. Check `effects.created[]` — what objects were actually created?
+5. Check `transaction.data.transaction.transactions[].MoveCall.package` — what package was actually called?
+
+### 18.2 Event Count Is a Fast Diagnostic
+
+If you expect 2 events but get 1, the first question is: "Am I calling the right package version?" Check the MoveCall package in the transaction input, not in the event type (event types always use the original package address).
+
+### 18.3 Diagnostic Logging Pattern
+
+Add temporary `console.log` before event parsing in the frontend:
+```typescript
+console.log('[ranked-start] tx digest:', result.digest);
+console.log('[ranked-start] events count:', result.events?.length);
+console.log('[ranked-start] events:', JSON.stringify(result.events, null, 2));
+```
+
+This turns a 100 EVE blind test into an informative diagnostic. Always add this for new on-chain features until they're confirmed working.
+
+### 18.4 `suix_queryEvents` for Historical Audit
+
+```
+POST https://fullnode.testnet.sui.io:443
+{ "method": "suix_queryEvents", "params": [{ "MoveEventType": "<pkg>::<module>::<EventType>" }, null, 5, true] }
+```
+
+Returns all historical events of that type. If the result is empty, the event was **never emitted** — strong evidence the code path was never reached.
+
+---
+
+## 19. Deploy & Config Mismatch Learnings (Added 2026-03-15)
+
+### 19.1 Verify Package ID in Built Bundle Before Deploying
+
+**Rule:** After every build, grep the output bundle for the expected package ID:
+```bash
+Select-String -Path "frontend/dist/assets/index-*.js" -Pattern "<expected_package_id>"
+```
+
+Also verify the **old** package ID is NOT present:
+```bash
+Select-String -Path "frontend/dist/assets/index-*.js" -Pattern "<old_package_id>"
+```
+
+Both checks should be run before every deployment. One match for the new ID, zero matches for the old.
+
+### 19.2 Preview vs Production URL Confusion
+
+| URL Pattern | What It Is |
+|-------------|-----------|
+| `https://<hash>.flappy-frontier.pages.dev` | Specific deployment (immutable, hash-identified) |
+| `https://<branch>.flappy-frontier.pages.dev` | Branch alias (mutable, updates on redeploy to that branch) |
+| `https://flappy-frontier.pages.dev` | Production (points to latest `main` deploy) |
+| `https://flappyfrontier.com` | Custom domain (CNAME to Cloudflare Pages production) |
+
+**Trap:** Deploying to a preview branch URL does NOT update production. You must explicitly deploy with `--branch main` or no `--branch` flag for production.
+
+### 19.3 Sponsor Service Must Match Frontend Package ID
+
+When you change `contractConfig.ts` `packageId`, you must ALSO:
+1. Update `ALLOWED_PACKAGE_ID` in `workers/sponsor-service/wrangler.toml`
+2. Redeploy the sponsor service: `cd workers/sponsor-service && npx wrangler deploy`
+
+If these are out of sync, the sponsor service will reject valid transactions with "Disallowed package" and the frontend will silently fall back to player-paid gas.
+
+### 19.4 Stale Bundles Are Silent Killers
+
+A stale frontend bundle will successfully execute transactions against the **old** package, getting old behavior without any errors. The user sees "transaction succeeded" but the expected new behavior (new events, new objects) is missing. This is extremely confusing because everything looks correct locally.
+
+**Prevention checklist after any contract upgrade:**
+1. Update `contractConfig.ts` packageId to new version
+2. Update `ALLOWED_PACKAGE_ID` in sponsor service
+3. `npm run build` in frontend
+4. Verify new package ID in built bundle (grep)
+5. Deploy sponsor service
+6. Deploy frontend to production
+7. Hard-refresh browser (Ctrl+Shift+R) to invalidate cache
+
+---
+
+## 20. File/Path References Inside This Repo (Useful Exemplars)
 
 ### Move Contracts
 | File | What It Exemplifies |
