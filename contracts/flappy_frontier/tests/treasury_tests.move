@@ -257,7 +257,9 @@ fun epoch_advances_after_payout() {
     );
 
     assert!(treasury.current_epoch() == 2);
-    assert!(treasury.epoch_start_ms() == 700_000);
+    // With anchored advancement, epoch_start_ms = epoch_end_ms (0 + 600_000),
+    // not clock_ms (700_000). No drift regardless of payout trigger time.
+    assert!(treasury.epoch_start_ms() == 600_000);
 
     payouts.destroy_empty();
     treasury.destroy_for_testing();

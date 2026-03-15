@@ -17,27 +17,20 @@ interface LeaderboardData {
   prizePool: number;
   epochStartMs: number;
   currentEpoch: number;
+  epochDurationMs: number;
 }
 
 function formatEve(baseUnits: number): string {
   return (baseUnits / 1_000_000_000).toFixed(0);
 }
 
-/** Compute the next Sunday 00:00 UTC after a given epoch start timestamp. */
-function getWeekEndMs(epochStartMs: number): number {
-  const d = new Date(epochStartMs);
-  const day = d.getUTCDay(); // 0=Sun
-  const daysUntilSunday = day === 0 ? 7 : 7 - day;
-  return Date.UTC(
-    d.getUTCFullYear(),
-    d.getUTCMonth(),
-    d.getUTCDate() + daysUntilSunday,
-    0, 0, 0, 0,
-  );
+/** Epoch end = on-chain anchor + configured duration (matches contract logic). */
+function getEpochEndMs(epochStartMs: number, epochDurationMs: number): number {
+  return epochStartMs + epochDurationMs;
 }
 
-function weekTimeState(epochStartMs: number): { label: string; endMs: number; expired: boolean } {
-  const endMs = getWeekEndMs(epochStartMs);
+function weekTimeState(epochStartMs: number, epochDurationMs: number): { label: string; endMs: number; expired: boolean } {
+  const endMs = getEpochEndMs(epochStartMs, epochDurationMs);
   const remainMs = endMs - Date.now();
   if (remainMs <= 0) return { label: 'Week ended', endMs, expired: true };
   const totalSeconds = Math.floor(remainMs / 1_000);
@@ -78,13 +71,17 @@ export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
       setLoading(true);
       setError(null);
 
-      const [lbResult, treasuryResult] = await Promise.all([
+      const [lbResult, treasuryResult, configResult] = await Promise.all([
         suiClient.getObject({
           id: CONTRACT_CONFIG.leaderboardId,
           options: { showContent: true },
         }),
         suiClient.getObject({
           id: CONTRACT_CONFIG.treasuryId,
+          options: { showContent: true },
+        }),
+        suiClient.getObject({
+          id: CONTRACT_CONFIG.gameConfigId,
           options: { showContent: true },
         }),
       ]);
@@ -113,7 +110,14 @@ export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
         currentEpoch = Number(tFields['current_epoch'] ?? 1);
       }
 
-      setData({ entries, prizePool, epochStartMs, currentEpoch });
+      let epochDurationMs: number = CONTRACT_CONFIG.epochDurationMs;
+      const cfgContent = configResult.data?.content;
+      if (cfgContent && cfgContent.dataType === 'moveObject') {
+        const cfgFields = cfgContent.fields as Record<string, unknown>;
+        epochDurationMs = Number(cfgFields['epoch_duration_ms'] ?? epochDurationMs);
+      }
+
+      setData({ entries, prizePool, epochStartMs, currentEpoch, epochDurationMs });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load leaderboard');
     } finally {
@@ -166,7 +170,7 @@ export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
   }, [isPayingOut, executeTransaction, fetchLeaderboard, account?.address, sponsorship.canSponsorGameTx]);
 
   const timeState = data
-    ? weekTimeState(data.epochStartMs)
+    ? weekTimeState(data.epochStartMs, data.epochDurationMs)
     : null;
 
   return (

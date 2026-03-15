@@ -102,10 +102,10 @@ public(package) fun distribute_payout<T>(
 
     let num_winners = winners.length();
 
-    // Zero entries: no payout, just reset epoch
+    // Zero entries: no payout, just advance epoch on the fixed grid
     if (num_winners == 0) {
         treasury.current_epoch = treasury.current_epoch + 1;
-        treasury.epoch_start_ms = clock_ms;
+        treasury.epoch_start_ms = epoch_end_ms;
         return vector[]
     };
 
@@ -144,9 +144,9 @@ public(package) fun distribute_payout<T>(
     // proportionally among actual winners (not just their nominal share percentage).
     // The last winner receives the remainder to avoid rounding dust.
 
-    // Advance epoch
+    // Advance epoch on fixed grid (no drift regardless of when payout is triggered)
     treasury.current_epoch = treasury.current_epoch + 1;
-    treasury.epoch_start_ms = clock_ms;
+    treasury.epoch_start_ms = epoch_end_ms;
 
     payouts
 }

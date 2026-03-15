@@ -5,6 +5,23 @@
 Newest entries first. See `docs/operations/DECISIONS_TEMPLATE.md` for format.
 
 ---
+## 2026-03-15 — Fix epoch cadence drift + enable gas sponsorship
+
+- **Goal:** Fix two live issues: (1) epoch advancement drifted because `trigger_payout` set `epoch_start_ms = clock_ms` instead of anchored `epoch_end_ms`. (2) Payout and all game txs were not sponsored because `VITE_SPONSOR_SERVICE_URL` was never set in Cloudflare Pages env.
+- **Root cause — drift:** `distribute_payout()` in treasury.move set `epoch_start_ms = clock_ms` (wall-clock at payout time), causing cumulative drift. Fixed to `epoch_start_ms = epoch_end_ms` (anchored advancement on fixed grid).
+- **Root cause — sponsorship:** Sponsor worker was live (`flappy-frontier-sponsor.michael-davis-home.workers.dev`) and code paths were correct, but the Pages env var `VITE_SPONSOR_SERVICE_URL` was never configured. Frontend always saw empty string → sponsorship disabled.
+- **Fix — contract:** Upgraded package to v2 (`0x7313...2e3d`). Changed both payout paths (zero-entries + normal) to use anchored epoch advancement. Added `RunReceiptCreatedEvent` for upgrade compatibility.
+- **Fix — frontend:** Replaced `getWeekEndMs()` (calendar Sunday alignment) with `getEpochEndMs(epochStartMs, epochDurationMs)` using on-chain anchor + duration from GameConfig. Updated `parseReceiptIdFromEvents` to check new event first with v1 fallback.
+- **Fix — deployment:** Set `VITE_SPONSOR_SERVICE_URL` on Cloudflare Pages (both preview + production). Redeployed frontend.
+- **Admin ops:** Triggered payout (epoch 3 started Mar 15 00:00 UTC). Set `epoch_duration_ms` to 604,800,000 (7 days). Epoch 3 ends Mar 22 00:00 UTC.
+- **Files:** `contracts/.../treasury.move`, `contracts/.../game.move`, `contracts/.../treasury_tests.move`, `frontend/.../LeaderboardPanel.tsx`, `frontend/.../seedProvider.ts`
+- **Diff:** ~60 LoC changed (contract + frontend + tests)
+- **Risk:** High (contract upgrade, treasury epoch logic, deployment config)
+- **Gates:** typecheck ✅ build ✅ move-build ✅ move-test ✅ (35/35) deploy ✅
+- **On-chain txs:** Upgrade `ExRe7CbdpZktL4RFN3ZP4YrVJsgMvGKExYzeJPMJrAqY`, Payout → epoch 3, SetDuration → 604800000
+- **V2 Package:** `0x731370112ec56704d123f90e200240d7a06b2955970750d770be3584557b9e3d`
+
+---
 ## 2026-03-14 — Fix weekly countdown to target Sunday 00:00 UTC
 
 - **Goal:** Countdown was showing ~7 days (anchor + duration) instead of targeting the next Sunday 00:00 UTC (~20h away). Label showed misleading "Week #2".

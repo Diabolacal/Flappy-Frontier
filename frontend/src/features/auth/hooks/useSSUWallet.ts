@@ -71,12 +71,14 @@ export function useSSUWallet(): SSUWalletInfo {
     }
   }, [targetWallet, isConnected, isConnecting, connectWallet]);
 
-  // Auto-connect: after dapp-kit autoConnect finishes without connecting,
+  // Auto-connect: once dapp-kit's native auto-connect is no longer in-flight,
   // if the EVE Frontier Client Wallet is present, connect automatically.
+  // 'idle' means autoConnect is enabled and still running — wait for it.
+  // 'disabled' (autoConnect=false) or 'attempted' (finished) — proceed.
   useEffect(() => {
     if (attemptedRef.current) return;
     if (!targetWallet) return;
-    if (autoConnectStatus !== 'attempted') return;
+    if (autoConnectStatus === 'idle') return;
     if (isConnected || isConnecting) return;
 
     attemptedRef.current = true;
@@ -96,7 +98,7 @@ export function useSSUWallet(): SSUWalletInfo {
     status = 'connected';
   } else if (isSSU && (isConnecting || attemptedRef.current)) {
     status = 'auto-connecting';
-  } else if (isSSU && autoConnectStatus !== 'attempted') {
+  } else if (isSSU && autoConnectStatus === 'idle') {
     status = 'detecting';
   } else if (isSSU) {
     status = 'ready';
