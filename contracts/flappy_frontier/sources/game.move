@@ -34,12 +34,18 @@ public struct RunReceipt has key {
 
 // === Events ===
 
-/// Emitted when a ranked run starts. Frontend reads the seed and receipt_id from tx events.
+/// Emitted when a ranked run starts. Frontend reads the seed from tx events.
 public struct RunStartedEvent has copy, drop {
     player: address,
     seed: u256,
     epoch: u64,
     timestamp_ms: u64,
+}
+
+/// Emitted alongside RunStartedEvent to provide the receipt object ID.
+/// Added in v2 (upgrade-compatible: new struct, original RunStartedEvent unchanged).
+public struct RunReceiptCreatedEvent has copy, drop {
+    player: address,
     receipt_id: ID,
 }
 
@@ -106,6 +112,10 @@ entry fun start_run<T>(
         seed,
         epoch,
         timestamp_ms,
+    });
+
+    event::emit(RunReceiptCreatedEvent {
+        player,
         receipt_id,
     });
 

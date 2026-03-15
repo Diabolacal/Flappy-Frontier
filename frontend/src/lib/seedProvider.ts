@@ -82,19 +82,19 @@ export function parseSeedFromEvents(
   return Number(BigInt(seedStr) & BigInt(0xffffffff));
 }
 
-/** Extract the RunReceipt object ID from RunStartedEvent in tx effects. */
+/** Extract the RunReceipt object ID from RunReceiptCreatedEvent in tx effects. */
 export function parseReceiptIdFromEvents(
   events: Array<{ type: string; parsedJson?: Record<string, unknown> }>,
 ): string {
-  const runEvent = events.find((e) =>
-    e.type.includes('::game::RunStartedEvent'),
+  const receiptEvent = events.find((e) =>
+    e.type.includes('::game::RunReceiptCreatedEvent'),
   );
-  if (!runEvent?.parsedJson) {
-    throw new Error('RunStartedEvent not found in transaction events');
+  if (!receiptEvent?.parsedJson) {
+    throw new Error('RunReceiptCreatedEvent not found in transaction events');
   }
-  const receiptId = String(runEvent.parsedJson['receipt_id'] ?? '');
+  const receiptId = String(receiptEvent.parsedJson['receipt_id'] ?? '');
   if (!receiptId) {
-    throw new Error('receipt_id not found in RunStartedEvent');
+    throw new Error('receipt_id not found in RunReceiptCreatedEvent');
   }
   return receiptId;
 }
