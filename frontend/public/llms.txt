@@ -1,0 +1,32 @@
+# Flappy Frontier
+
+> A ranked Flappy Bird-style minigame built on the Sui blockchain for the EVE Frontier hackathon (March 2026).
+
+## Live URL
+https://flappy-frontier.pages.dev/
+
+## What is Flappy Frontier?
+Flappy Frontier is a browser-based side-scrolling game inspired by Flappy Bird, set in the EVE Frontier universe. Players navigate a spaceship through asteroid pipes. The game offers two modes:
+
+- **Practice mode:** Free to play, no wallet required. Play directly in any browser or inside the EVE Frontier in-game browser.
+- **Ranked mode:** Connect a Sui wallet, pay a small EVE token entry fee, and compete for a spot on the on-chain leaderboard. Top players earn weekly EVE prize payouts.
+
+## Key Features
+- Canvas 2D game loop running at 60fps with delta-time physics
+- On-chain leaderboard and score submission via Sui Move smart contracts
+- Weekly automated prize payouts from the treasury
+- Provably fair game seeding using sui::random
+- Gas-sponsored transactions for seamless gameplay
+- Playable inside the EVE Frontier in-game browser (787×1198px portrait webview)
+
+## Technology Stack
+- Frontend: Vite + React + Canvas 2D
+- Smart Contracts: Sui Move (leaderboard, treasury, game seeding)
+- Deployment: Cloudflare Pages
+- Blockchain: Sui (Stillness testnet)
+
+## Source Code
+https://github.com/Diabolacal/Flappy-Frontier
+
+## Hackathon
+EVE Frontier Hackathon (March 2026) — submitted via Deep Surge.

@@ -1,0 +1,16 @@
+{
+  "name": "Flappy Frontier",
+  "short_name": "Flappy Frontier",
+  "description": "A ranked Flappy Bird-style minigame built on Sui for the EVE Frontier hackathon.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/assets/branding/flappy-frontier-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+}

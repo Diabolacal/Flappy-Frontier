@@ -30,7 +30,6 @@ build/
 *.tgz
 .npm
 .eslintcache
-package-lock.json
 
 # Vite cache
 .vite/
