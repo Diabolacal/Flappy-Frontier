@@ -5,6 +5,19 @@
 Newest entries first. See `docs/operations/DECISIONS_TEMPLATE.md` for format.
 
 ---
+## 2026-03-15 — Fix MoveCall package target: v1→v6
+
+- **Goal:** Fix ranked-run blocker — on-chain RunReceiptCreatedEvent never emitted despite v6 contract upgrade.
+- **Root cause:** Sui executes the bytecode of the **exact package ID** specified in MoveCall targets. The frontend (`contractConfig.ts`) targeted v1 original package (`0x355b...`), which is immutable and contains only v1 bytecode. All upgrades (v2–v6) created NEW immutable package objects — but the frontend never updated the target. Evidence: tx `BSAcX5rs...` emitted only `RunStartedEvent` (v1 behavior).
+- **Fix:** Updated `packageId` in `contractConfig.ts` to v6 (`0xde1554...`). Updated `ALLOWED_PACKAGE_ID` in sponsor-service `wrangler.toml` to match. Redeployed both.
+- **Files:** `frontend/src/lib/contractConfig.ts`, `workers/sponsor-service/wrangler.toml`
+- **Diff:** +3/-3 LoC
+- **Risk:** High (contract call routing + sponsor service)
+- **Gates:** typecheck ✅ build ✅ bundle-verify ✅ (v6 ID in bundle: 1, v1 ID: 0)
+- **Key learning:** Sui package upgrades do NOT auto-redirect MoveCall targets. Original package remains immutable v1 bytecode. Clients must target the specific upgrade version to execute its code.
+- **Follow-ups:** Remove diagnostic logging after confirming ranked-start works. Future upgrades must update `packageId` and `ALLOWED_PACKAGE_ID`.
+
+---
 ## 2026-03-15 — Contract v6 force-recompile: Fix stale upgrade bytecode
 
 - **Goal:** Fix ranked-run blocker that persisted through v2→v4 upgrades. `RunReceiptCreatedEvent` never emitted on-chain.
