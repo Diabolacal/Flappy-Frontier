@@ -24,6 +24,13 @@ function formatEve(baseUnits: number): string {
   return (baseUnits / 1_000_000_000).toFixed(0);
 }
 
+const EVE_TO_LUX = 100;
+
+function formatLux(eveBaseUnits: number): string {
+  const lux = Math.round((eveBaseUnits / 1_000_000_000) * EVE_TO_LUX);
+  return lux.toLocaleString('en-US');
+}
+
 /** Epoch end = on-chain anchor + configured duration (matches contract logic). */
 function getEpochEndMs(epochStartMs: number, epochDurationMs: number): number {
   return epochStartMs + epochDurationMs;
@@ -194,7 +201,7 @@ export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
               <div className="flex justify-between items-baseline mb-2">
                 <span className="text-gray-400 text-sm">Weekly Pool</span>
                 <span className="text-xl font-bold" style={{ color: '#ff4c26' }}>
-                  {formatEve(data.prizePool)} EVE
+                  {formatEve(data.prizePool)} EVE{' / '}{formatLux(data.prizePool)} LUX
                 </span>
               </div>
               <div className="flex justify-between text-xs text-gray-500">
@@ -224,7 +231,7 @@ export function LeaderboardPanel({ onClose }: { onClose: () => void }) {
             {timeState.expired && data.prizePool > 0 && data.entries.length > 0 && (
               <div className="mt-2 p-3 bg-gray-900/60 border border-gray-600 rounded-lg">
                 <div className="text-gray-300 text-xs mb-2">
-                  Week has ended. {formatEve(data.prizePool)} EVE is ready to be distributed
+                  Week has ended. {formatEve(data.prizePool)} EVE / {formatLux(data.prizePool)} LUX is ready to be distributed
                   to the top {Math.min(data.entries.length, CONTRACT_CONFIG.payoutShares.length)} players.
                   Anyone can trigger this. It&apos;s a public on-chain action.
                 </div>
