@@ -80,6 +80,12 @@ export function GamePage({ ssuWallet }: GamePageProps) {
       try {
         const tx = await buildStartRunTransaction(suiClient, player.address);
         const result = await executeTransaction(tx, player.address);
+
+        // Diagnostic logging — remove after ranked-start is confirmed working
+        console.log('[ranked-start] tx digest:', (result as Record<string, unknown>).digest);
+        console.log('[ranked-start] events count:', ((result as Record<string, unknown>).events as unknown[] | undefined)?.length ?? 'undefined');
+        console.log('[ranked-start] events:', JSON.stringify((result as Record<string, unknown>).events, null, 2));
+
         const events = (result as { events?: Array<{ type: string; parsedJson?: Record<string, unknown> }> }).events ?? [];
         const seed = parseSeedFromEvents(events);
         const receiptId = parseReceiptIdFromEvents(events);
@@ -197,6 +203,12 @@ export function GamePage({ ssuWallet }: GamePageProps) {
       try {
         const tx = await buildStartRunTransaction(suiClient, player.address);
         const result = await executeTransaction(tx, player.address);
+
+        // Diagnostic logging — remove after ranked-start is confirmed working
+        console.log('[ranked-restart] tx digest:', (result as Record<string, unknown>).digest);
+        console.log('[ranked-restart] events count:', ((result as Record<string, unknown>).events as unknown[] | undefined)?.length ?? 'undefined');
+        console.log('[ranked-restart] events:', JSON.stringify((result as Record<string, unknown>).events, null, 2));
+
         const events = (result as { events?: Array<{ type: string; parsedJson?: Record<string, unknown> }> }).events ?? [];
         const seed = parseSeedFromEvents(events);
         const receiptId = parseReceiptIdFromEvents(events);

@@ -90,7 +90,10 @@ export function parseReceiptIdFromEvents(
     e.type.includes('::game::RunReceiptCreatedEvent'),
   );
   if (!receiptEvent?.parsedJson) {
-    throw new Error('RunReceiptCreatedEvent not found in transaction events');
+    const eventTypes = events.map((e) => e.type).join(', ');
+    throw new Error(
+      `RunReceiptCreatedEvent not found. Got ${events.length} event(s): [${eventTypes}]`,
+    );
   }
   const receiptId = String(receiptEvent.parsedJson['receipt_id'] ?? '');
   if (!receiptId) {
