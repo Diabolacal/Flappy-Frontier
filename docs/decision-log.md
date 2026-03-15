@@ -5,6 +5,21 @@
 Newest entries first. See `docs/operations/DECISIONS_TEMPLATE.md` for format.
 
 ---
+## 2026-03-15 — Contract v6 force-recompile: Fix stale upgrade bytecode
+
+- **Goal:** Fix ranked-run blocker that persisted through v2→v4 upgrades. `RunReceiptCreatedEvent` never emitted on-chain.
+- **Root cause:** Previous upgrades (v2, v4) published successfully but the on-chain function body of `start_run` remained unchanged — still v1 behavior (1 event, 0 created objects). Confirmed via tx `BSAcX5rs...` (post-v4, 383s after upgrade): still only `RunStartedEvent`. Suspected stale build cache during upgrade compilation.
+- **Fix:** Deleted `build/` dir and published v6 with `--force` flag (forces recompilation). v5 was also published (first command) making the path v4→v5→v6. V6 module verified on-chain: `RunReceiptCreatedEvent` struct present, `start_run` has correct 6-param signature.
+- **Diagnostics added:** `console.log` in GamePage.tsx for ranked-start flow; improved error message in `parseReceiptIdFromEvents` showing event types received.
+- **Files:** `contracts/flappy_frontier/Published.toml`, `frontend/src/features/game/components/GamePage.tsx`, `frontend/src/lib/seedProvider.ts`
+- **Diff:** +18/-3 LoC
+- **Risk:** High (contract upgrade + diagnostic logging)
+- **Gates:** typecheck ✅ build ✅ move-build ✅ move-test ✅ (35/35) deploy ✅
+- **V6 Package:** `0xde1554bde721b2a256ea6b3b21ed08b174308a676216e11df8c651f34353e4eb`
+- **Preview:** https://fix-ranked-start-v6.flappy-frontier.pages.dev
+- **Follow-ups:** Remove diagnostic logging after confirming ranked-start works.
+
+---
 ## 2026-03-15 — Contract v4 upgrade: Fix start_run RunReceipt creation
 
 - **Goal:** Fix ranked-run blocker — `RunReceiptCreatedEvent not found in transaction events` in production.
