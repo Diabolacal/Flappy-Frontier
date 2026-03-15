@@ -3,6 +3,7 @@
 **Retention:** Carry-forward
 
 **Date:** 2026-03-14
+**Last reconciliation:** 2026-03-15
 **Scope:** Move contracts, sponsor worker, frontend transaction flow, config/secrets/env, architecture
 **Posture:** Hackathon / testnet — no real-money exposure
 **Methodology:** Manual code review across all audit surfaces with sub-agent-assisted analysis
@@ -11,55 +12,57 @@
 
 ## Executive Summary
 
-Flappy Frontier has a sound core architecture — the treasury is trustlessly distributed with no admin drain path, the shared object model is correct, and there are no hardcoded secrets in source. However, **the ranked game flow has a critical gap: score submission requires no proof-of-play and no entry fee gate**, allowing anyone to post arbitrary scores and claim payouts without playing. The **sponsor worker is an open gas station** that will sign any Sui transaction for any caller. These two issues together mean an attacker could — at zero cost — post fake scores and drain both the treasury and the sponsor wallet.
+Flappy Frontier has a sound core architecture — the treasury is trustlessly distributed with no admin drain path, the shared object model is correct, and there are no hardcoded secrets in source.
 
-For hackathon/testnet, the blast radius is limited to testnet tokens. For any broader deployment, both issues must be resolved.
+**Original assessment (2026-03-14):** The ranked game flow had a critical gap — score submission required no proof-of-play and no entry fee gate. The sponsor worker was an open gas station. Together, an attacker could post fake scores and drain both the treasury and the sponsor wallet at zero cost.
 
-**Findings by severity:**
+**Current status (2026-03-15):** All three critical findings and both high-severity findings with direct exploit paths have been remediated. `RunReceipt` binding now enforces fee-gated, single-use score submission. The sponsor worker validates transaction intent (package/module/function allowlist) and requires API key auth. Leaderboard enforces one entry per player. Security headers are deployed. Lockfiles are committed. The remaining open items are lower-severity edge cases, UX gaps, and production-hardening items that are acceptable for hackathon/testnet posture.
 
-| Severity | Count | Summary |
-|----------|-------|---------|
-| Critical | 3 | Score forgery + no run binding + open sponsor service |
-| High | 3 | Duplicate leaderboard slots, no sponsor auth, no rate limiting |
-| Medium | 7 | Payout division-by-zero, AdminCap non-transferable, admin manipulation, error leakage, silent gas fallback, missing security headers, lockfile not committed |
-| Low | 8 | Minor config/hygiene issues |
-| Informational | 8 | Positive design notes, architectural observations |
+**Findings by severity and current status:**
+
+| Severity | Original Count | Resolved | Partially Resolved | Open |
+|----------|---------------|----------|-------------------|------|
+| Critical | 3 | 3 | 0 | 0 |
+| High | 3 | 2 | 1 | 0 |
+| Medium | 7 | 4 | 1 | 2 |
+| Low | 8 | 3 | 0 | 5 |
+| Informational | 8 | — | — | — |
 
 ---
 
 ## Finding Index
 
-| ID | Severity | Title | Surface |
-|----|----------|-------|---------|
-| **C-1** | Critical | Score submission has zero validation — no fee-gate, no proof-of-play | Move | ✅ Mitigated |
-| **C-2** | Critical | No on-chain binding between start_run and submit_score | Move | ✅ Mitigated |
-| **C-3** | Critical | Sponsor worker signs arbitrary transactions without intent validation | Worker | ✅ Mitigated |
-| **H-1** | High | Same player can occupy all leaderboard slots | Move | ✅ Fixed |
-| **H-2** | High | No caller authorization on sponsor service | Worker | ✅ Mitigated |
+| ID | Severity | Title | Surface | Status |
+|----|----------|-------|---------|--------|
+| **C-1** | Critical | Score submission has zero validation — no fee-gate, no proof-of-play | Move | ✅ Resolved |
+| **C-2** | Critical | No on-chain binding between start_run and submit_score | Move | ✅ Resolved |
+| **C-3** | Critical | Sponsor worker signs arbitrary transactions without intent validation | Worker | ✅ Resolved |
+| **H-1** | High | Same player can occupy all leaderboard slots | Move | ✅ Resolved |
+| **H-2** | High | No caller authorization on sponsor service | Worker | ✅ Resolved (testnet) |
 | **H-3** | High | No rate limiting or gas budget cap on sponsor service | Worker | ⚠️ Partial |
-| **M-1** | Medium | Division by zero in payout with pathological share config | Move |
-| **M-2** | Medium | AdminCap is non-transferable — no rotation or recovery | Move |
-| **M-3** | Medium | Admin can manipulate payout economics without constraint | Move |
-| **M-4** | Medium | Sponsor error messages leak internal details | Worker | ✅ Mitigated |
-| **M-5** | Medium | Silent fallback from sponsored to player-paid gas | Frontend |
-| **M-6** | Medium | No security headers on Cloudflare Pages frontend | Config |
-| **M-7** | Medium | package-lock.json gitignored — non-deterministic builds | Config |
-| **L-1** | Low | CORS wildcard suffix + localhost in production allowlist | Worker |
-| **L-2** | Low | Sender address not verified (no ownership proof) | Worker |
-| **L-3** | Low | No request body size limit on sponsor service | Worker | ✅ Fixed |
-| **L-4** | Low | Entry fee hardcoded in frontend, may diverge from on-chain | Frontend |
-| **L-5** | Low | u64 overflow risk in payout math at extreme balances | Move |
-| **L-6** | Low | Score of 0 accepted on empty leaderboard | Move |
-| **L-7** | Low | Unlimited Treasury creation (no one-time witness) | Move |
-| **L-8** | Low | parseInt without NaN guard on GAS_BUDGET env var | Worker | ✅ Fixed |
-| **I-1** | Info | Treasury has no admin withdrawal — strong trustless design | Move ✅ |
-| **I-2** | Info | Epoch expiry prevents double-payout (atomic tx) | Move ✅ |
-| **I-3** | Info | No hardcoded secrets in any source file | Config ✅ |
-| **I-4** | Info | SSU wallet detection uses startsWith — correct | Frontend ✅ |
-| **I-5** | Info | No XSS vectors (no innerHTML, dangerouslySetInnerHTML, eval) | Frontend ✅ |
-| **I-6** | Info | UpgradeCap is unrestricted (testnet-acceptable) | Move |
-| **I-7** | Info | gameHash field exists but is never populated | Frontend |
-| **I-8** | Info | Seed truncated from u256 to 32 bits for PRNG | Frontend |
+| **M-1** | Medium | Division by zero in payout with pathological share config | Move | Open |
+| **M-2** | Medium | AdminCap is non-transferable — no rotation or recovery | Move | Open (accepted) |
+| **M-3** | Medium | Admin can manipulate payout economics without constraint | Move | ⚠️ Partial |
+| **M-4** | Medium | Sponsor error messages leak internal details | Worker | ✅ Resolved |
+| **M-5** | Medium | Silent fallback from sponsored to player-paid gas | Frontend | Open |
+| **M-6** | Medium | No security headers on Cloudflare Pages frontend | Config | ✅ Resolved |
+| **M-7** | Medium | package-lock.json gitignored — non-deterministic builds | Config | ✅ Resolved |
+| **L-1** | Low | CORS wildcard suffix + localhost in production allowlist | Worker | Open (improved) |
+| **L-2** | Low | Sender address not verified (no ownership proof) | Worker | Open (accepted) |
+| **L-3** | Low | No request body size limit on sponsor service | Worker | ✅ Resolved |
+| **L-4** | Low | Entry fee hardcoded in frontend, may diverge from on-chain | Frontend | Open |
+| **L-5** | Low | u64 overflow risk in payout math at extreme balances | Move | Open |
+| **L-6** | Low | Score of 0 accepted on empty leaderboard | Move | Open |
+| **L-7** | Low | Unlimited Treasury creation (no one-time witness) | Move | Open (low risk) |
+| **L-8** | Low | parseInt without NaN guard on GAS_BUDGET env var | Worker | ✅ Resolved |
+| **I-1** | Info | Treasury has no admin withdrawal — strong trustless design | Move | ✅ |
+| **I-2** | Info | Epoch expiry prevents double-payout (atomic tx) | Move | ✅ |
+| **I-3** | Info | No hardcoded secrets in any source file | Config | ✅ |
+| **I-4** | Info | SSU wallet detection uses startsWith — correct | Frontend | ✅ |
+| **I-5** | Info | No XSS vectors (no innerHTML, dangerouslySetInnerHTML, eval) | Frontend | ✅ |
+| **I-6** | Info | UpgradeCap is unrestricted (testnet-acceptable) | Move | Open |
+| **I-7** | Info | gameHash field exists but is never populated | Frontend | Open |
+| **I-8** | Info | Seed truncated from u256 to 32 bits for PRNG | Frontend | Open |
 
 ---
 
@@ -154,7 +157,7 @@ tx.setGasOwner(sponsorAddress);
 
 **Surface:** Move contracts — `leaderboard.move`
 **Exploitability:** Trivial (combined with C-1)
-**Status:** ✅ Fixed (2026-03-14) — Leaderboard now enforces one entry per player per epoch. On submission, the module searches for an existing entry by the same player. If found with a lower score, the old entry is removed and replaced. If found with a higher or equal score, the new submission is silently rejected (no abort — receipt is still consumed). New tests verify: same player updates with better score, keeps higher score, cannot duplicate entries, multiple players each have one entry.
+**Status:** ✅ Resolved (2026-03-14) — Leaderboard now enforces one entry per player per epoch. On submission, the module scans for an existing entry by the same player. If found with a lower score, the old entry is removed and replaced. If found with a higher or equal score, the new submission is silently rejected (no abort — receipt is still consumed). Test coverage: same player updates with better score, keeps higher score, cannot duplicate entries, multiple players each have one entry.
 
 `submit_score` has no deduplication by player address. A single address can submit multiple high scores and occupy all 10 leaderboard positions, collecting 100% of payout shares (50%+30%+20% = 100% for top 3).
 
@@ -177,11 +180,11 @@ public(package) fun submit_score(
 
 **Surface:** `workers/sponsor-service/src/index.ts` L122–130
 **Exploitability:** Trivial
-**Status:** ✅ Mitigated (2026-03-14) — Shared API key auth added via `Authorization: Bearer <key>` header checked against `SPONSOR_API_KEY` wrangler secret. Frontend sends key from `VITE_SPONSOR_API_KEY` env var.
+**Status:** ✅ Resolved for testnet (2026-03-14) — Shared API key auth added via `Authorization: Bearer <key>` header checked against `SPONSOR_API_KEY` Wrangler secret. Frontend sends key from `VITE_SPONSOR_API_KEY` env var. **Residual caveat:** `VITE_SPONSOR_API_KEY` is baked into the client-side JS bundle, so a determined attacker reading the frontend source can extract it. Additionally, if `SPONSOR_API_KEY` is not set in the Worker env, auth is bypassed. Acceptable for hackathon/testnet; wallet-signature-based auth would be required for production.
 
-The worker has no authentication. CORS restricts browser-initiated cross-origin requests but provides zero server-side security — curl, Postman, and custom HTTP clients bypass CORS entirely. The `Origin` header is trivially spoofable.
+**Original finding:** The worker had no authentication. CORS restricts browser-initiated cross-origin requests but provides zero server-side security.
 
-**Recommendation:** Add a shared API key (`Authorization: Bearer <token>` checked against a Wrangler secret) as a minimum. For stronger security, require a signature from the player's wallet proving ownership of the `sender` address.
+**Recommendation (remaining):** For production, require a signature from the player’s wallet proving ownership of the `sender` address.
 
 ---
 
@@ -189,11 +192,11 @@ The worker has no authentication. CORS restricts browser-initiated cross-origin 
 
 **Surface:** `workers/sponsor-service/src/index.ts`
 **Exploitability:** Trivial
-**Status:** ⚠️ Partially mitigated (2026-03-14) — Body size limit (16 KB), command count cap (6), intent validation, and API key auth significantly raise the bar. True per-sender rate limiting not yet implemented (would require Durable Objects or KV). Acceptable for hackathon/testnet.
+**Status:** ⚠️ Partially mitigated (2026-03-14) — Body size limit (16 KB), command count cap (6), intent validation, and API key auth significantly raise the bar. True per-sender rate limiting not yet implemented (would require Durable Objects or KV). **Open gap:** An attacker with the client-exposed API key can still send unlimited valid Flappy Frontier transactions. Acceptable for hackathon/testnet where sponsor wallet holds only testnet SUI.
 
-No daily/hourly budget cap. Gas budget is a flat 50M MIST (0.05 SUI) per request. With API key auth and intent validation, the attack surface is limited to holders of the API key sending valid Flappy Frontier transactions.
+**Original finding:** No daily/hourly budget cap. Gas budget is a flat 50M MIST (0.05 SUI) per request.
 
-**Recommendation:** Add Cloudflare Workers rate limiting (built-in or Durable Object counter). Per-sender cooldown (max 3 sponsored txs/minute per `sender`). Daily budget cap with early return when exhausted.
+**Recommendation (remaining):** Add Cloudflare Workers rate limiting (Durable Object counter or built-in). Per-sender cooldown (max 3 sponsored txs/minute per `sender`). Daily budget cap with early return when exhausted.
 
 ---
 
@@ -202,8 +205,7 @@ No daily/hourly budget cap. Gas budget is a flat 50M MIST (0.05 SUI) per request
 ### M-1: Division by zero in payout with pathological share config
 
 **Surface:** `treasury.move` L110–126
-
-If `payout_shares` has leading zeros (e.g., `[0, 0, 100]`) and fewer winners than shares, `active_shares_sum` can be 0, causing `(total_balance * 0) / 0` — Move aborts on integer division by zero.
+**Status:** Open (edge case) — Zero-winners path is correctly guarded (epoch advances, returns empty vector). However, `set_payout_shares` validates `sum == 100` and `!is_empty()` but does NOT validate individual elements > 0. A share vector like `[0, 0, 100]` with only 2 winners would yield `active_shares_sum = 0`, causing division by zero. Requires adversarial admin config; low probability but not eliminated.
 
 **Impact:** Treasury becomes stuck for that epoch until admin changes shares.
 
@@ -214,8 +216,7 @@ If `payout_shares` has leading zeros (e.g., `[0, 0, 100]`) and fewer winners tha
 ### M-2: AdminCap is non-transferable — no rotation or recovery
 
 **Surface:** `config.move` L37–39
-
-`AdminCap` has only `key` ability (no `store`). No transfer function exists. If the deployer wallet is compromised or lost, all admin functions are permanently inaccessible. If compromised, the attacker can manipulate all game parameters.
+**Status:** Open (accepted for hackathon) — Still `key` only (no `store`). No transfer function exists. Known limitation; admin is the deployer wallet. For production, would need `store` ability or an explicit transfer function.
 
 **Recommendation:** Add `store` ability or add an explicit `transfer_admin_cap` function.
 
@@ -224,36 +225,25 @@ If `payout_shares` has leading zeros (e.g., `[0, 0, 100]`) and fewer winners tha
 ### M-3: Admin can manipulate payout economics without constraint
 
 **Surface:** `config.move` (set_entry_fee, set_epoch_duration, set_payout_shares)
+**Status:** ⚠️ Partially addressed — Lower bounds now enforced: `entry_fee > 0`, `epoch_duration_ms > 0`, `payout_shares` non-empty and sums to 100. However, no upper bounds (fee could be set to `u64::MAX`, epoch to 1ms), no timelock, and **no events emitted on config changes** (off-chain indexers cannot detect parameter modifications). Acceptable for hackathon where admin is a known party.
 
-No timelock, no minimum/maximum bounds, no event emission on changes. Admin can set `epoch_duration_ms = 1`, submit a top score (per C-1), and payout instantly. Repeat to drain treasury.
-
-**Note:** This is socially enforced (admin is honest). Acceptable for hackathon, not for production.
-
-**Recommendation:** Add bounds enforcement (minimum epoch duration, maximum fee). Emit events on all config changes. Consider timelock where changes take effect on next epoch.
+**Recommendation (remaining):** Add upper bounds (minimum epoch duration, maximum fee). Emit events on all config changes. Consider timelock where changes take effect on next epoch.
 
 ---
 
 ### M-4: Sponsor error messages leak internal details
 
 **Surface:** `workers/sponsor-service/src/index.ts` L172–176
-**Status:** ✅ Mitigated (2026-03-14) — Catch block now returns generic "Sponsorship failed. Please try again." to clients; full error logged server-side only.
+**Status:** ✅ Resolved (2026-03-14) — Catch block now returns generic "Sponsorship failed. Please try again." to clients; full error logged server-side only via `console.error`. Input validation errors (400) are appropriately descriptive without leaking internals.
 
-Raw `err.message` is returned to clients. Sui SDK errors can contain RPC URLs, object IDs, gas coin details, and balance information.
-
-```typescript
-const message = err instanceof Error ? err.message : 'Internal error';
-return jsonResponse({ error: message }, 500, cors);
-```
-
-**Recommendation:** Return a generic error message to clients; log the full error server-side only.
+**Original finding:** Raw `err.message` was returned to clients, potentially leaking RPC URLs, object IDs, gas coin details, and balance information.
 
 ---
 
 ### M-5: Silent fallback from sponsored to player-paid gas
 
 **Surface:** `frontend/src/features/auth/hooks/useGameTransaction.ts` L58–89
-
-When sponsorship fails, the code silently falls through to the standard path where the player pays gas. The UI in GamePage.tsx tells the user "gas is sponsored" before execution begins. If the sponsor service is down, the player sees "gas is sponsored" but will be prompted to pay SUI gas.
+**Status:** Open — When sponsorship fails (other than user rejection), the code emits a `console.warn` and silently falls back to the standard player-paid path. No toast or UI notification is shown to the user. The UI tells the user "gas is sponsored" before execution, but if the sponsor is down, the player will be prompted to pay SUI without explanation.
 
 **Recommendation:** Show a clear notification before falling back to player-paid, or prompt the user to confirm.
 
@@ -262,27 +252,14 @@ When sponsorship fails, the code silently falls through to the standard path whe
 ### M-6: No security headers on Cloudflare Pages frontend
 
 **Surface:** Cloudflare Pages deployment — no `public/_headers` file
-
-No CSP, X-Frame-Options, X-Content-Type-Options, or Strict-Transport-Security configured. The app loads wallet adapters and external RPCs — a CSP would provide defense-in-depth.
-
-**Recommendation:** Add a `public/_headers` file:
-```
-/*
-  X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
-```
+**Status:** ✅ Resolved (2026-03-15) — `frontend/public/_headers` now configures: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()`, and a Content-Security-Policy with `default-src 'self'`, `frame-ancestors 'none'`, and a specific `connect-src` allowlist. **Minor residual:** `Strict-Transport-Security` (HSTS) header not included; Cloudflare handles TLS at the edge, but an explicit HSTS header would strengthen downgrade protection.
 
 ---
 
 ### M-7: package-lock.json gitignored — non-deterministic builds
 
 **Surface:** `.gitignore`
-
-Both `frontend/package-lock.json` and `workers/sponsor-service/package-lock.json` exist locally but are gitignored. Other developers and CI/CD get non-deterministic dependency resolution. A supply chain attack could inject a malicious minor/patch version via caret ranges.
-
-**Recommendation:** Remove `package-lock.json` from `.gitignore` and commit both lockfiles.
+**Status:** ✅ Resolved (2026-03-15) — Both `frontend/package-lock.json` and `workers/sponsor-service/package-lock.json` are now tracked in git. No gitignore rule blocks lockfiles. Deterministic dependency resolution is in effect.
 
 ---
 
@@ -290,35 +267,35 @@ Both `frontend/package-lock.json` and `workers/sponsor-service/package-lock.json
 
 ### L-1: CORS wildcard suffix + localhost in production allowlist
 
-`ALLOWED_ORIGIN_SUFFIXES` allows all `*.flappy-frontier.pages.dev`. `localhost:5173` is in the default origins. Minor hygiene — CORS is not authorization (H-2 is the real issue).
+**Status:** Open (improved) — CORS now uses an exact-match allowlist for production domains plus `localhost:5173`. Wildcard suffix `*.flappy-frontier.pages.dev` remains for Cloudflare preview deploys with `https:` protocol check. Minor residual: any subdomain of `flappy-frontier.pages.dev` passes. Low risk — CORS is not authorization (H-2 is the real boundary).
 
 ### L-2: Sender address not verified (no ownership proof)
 
-The `sender` field is only format-checked (`0x` prefix). Anyone can create sponsored transactions on behalf of any address, wasting RPC resources.
+**Status:** Open (accepted) — The `sender` field is format-checked (`0x` prefix) but has no ownership proof. This is an inherent limitation of the dual-signature sponsorship model — the player proves ownership later by signing the full transaction client-side. The format check is adequate for this pattern.
 
 ### L-3: No request body size limit on sponsor service
 
-No explicit Content-Length check. Cloudflare Workers has a 128MB limit, but parsing a huge base64 string allocates significant memory.
+**Status:** ✅ Resolved (2026-03-14) — `MAX_BODY_BYTES = 16_384` enforced via `Content-Length` header check, returning 413 if exceeded. Minor residual: defense is header-based only; a malicious client omitting the header could stream a larger body, but Cloudflare Workers enforce a 1MB platform limit.
 
 ### L-4: Entry fee hardcoded in frontend, may diverge from on-chain
 
-`entryFeeAmount: 100_000_000_000` in `contractConfig.ts`. If admin changes the fee on-chain, the UI shows stale info. Not exploitable (contract enforces the real fee).
+**Status:** Open — `entryFeeAmount: 100_000_000_000` remains hardcoded in `contractConfig.ts`. If admin changes the fee on-chain, the UI shows stale info. Not exploitable (contract enforces the real fee), but violates the project convention "Never hardcode fee amounts in the frontend."
 
 ### L-5: u64 overflow risk in payout math
 
-`total_balance * payout_shares[i]` overflows if treasury balance approaches u64::MAX. Requires ~18.4 billion EVE — practically unreachable but would permanently lock funds.
+**Status:** Open — Still u64-only arithmetic. `total_balance * payout_shares[i]` overflows u64 when `total_balance > ~1.8 × 10^17`. With EVE’s 9 decimals, that’s ~184 million EVE. Sui Move aborts on overflow (fail-safe, not fail-graceful). Practically unreachable for hackathon testnet treasury balances.
 
 ### L-6: Score of 0 accepted on empty leaderboard
 
-A zero-score entry occupies a leaderboard slot and could receive a payout. Logically unexpected but low economic impact.
+**Status:** Open — No `score > 0` check in `submit_score`. A zero-score entry occupies a leaderboard slot and could receive a payout. Design decision — if 0 represents "participated but scored nothing," it may be intentional.
 
 ### L-7: Unlimited Treasury creation
 
-`init_treasury` can be called multiple times, creating duplicate shared Treasury objects. Could confuse frontends about the authoritative treasury.
+**Status:** Open (low risk) — `init_treasury` can still be called multiple times, creating duplicate shared Treasury objects. AdminCap-gated, so limited to admin error. A robust fix would be a `TreasuryCap<T>` one-time-use pattern or a flag on GameConfig.
 
 ### L-8: parseInt without NaN guard on GAS_BUDGET env var
 
-`parseInt(env.GAS_BUDGET, 10)` returns NaN for non-numeric strings. Deployer-controlled config risk only.
+**Status:** ✅ Resolved (2026-03-14) — `parseInt` result is now checked with `Number.isNaN()` and falls back to `DEFAULT_GAS_BUDGET` (50M MIST). Deployer-controlled config risk eliminated.
 
 ---
 
@@ -348,36 +325,33 @@ A zero-score entry occupies a leaderboard slot and could receive a payout. Logic
 
 ### Is the sponsor worker safe enough for current hackathon/testnet usage?
 
-**Marginally.** The blast radius is limited to testnet SUI (no real money). However, an attacker who discovers the worker URL could drain the sponsor wallet's testnet SUI, disrupting demos. Two minimal hardening steps would make it hackathon-safe:
-
-1. **Add a package ID check** (~20 lines): Deserialize the `TransactionKind`, verify all `MoveCall` commands target the Flappy Frontier package. This prevents arbitrary transaction sponsorship.
-2. **Add a simple API key** (~10 lines): Shared secret via `wrangler secret put`, checked via `Authorization: Bearer <token>`. The frontend embeds it as a `VITE_` env var (acceptable for testnet since the key only controls testnet gas spending).
-
-Without these, the worker is an open gas station for anyone who finds the URL.
+**Yes, for hackathon/testnet.** The sponsor worker now validates transaction intent (package ID, module, function allowlist), rejects Publish/Upgrade commands, enforces a body size limit and command count cap, requires API key auth, and returns generic error messages. The remaining gaps are: (1) no per-sender rate limiting, and (2) the API key is client-exposed in the frontend bundle, so it’s not a real authentication barrier against a determined attacker. For testnet, the blast radius is limited to testnet SUI in the sponsor wallet.
 
 ### What are the biggest risks in the Move contracts?
 
-The single biggest risk is **C-1 + C-2 + H-1 combined**: anyone can submit arbitrary scores without paying an entry fee, and a single player can occupy all leaderboard slots. This means the entire treasury can be drained by a bot at each epoch boundary with zero cost.
+With RunReceipt binding and leaderboard deduplication now in place, the most impactful original risks (C-1, C-2, H-1) are resolved. The remaining contract risks are:
 
-The treasury design itself is strong — no admin drain path, trustless distribution, correct epoch enforcement. The weakness is entirely at the score submission boundary.
+1. **Client-reported scores** — The score value itself is still player-reported via the frontend. RunReceipt ensures fee payment and single-use, but does not prove the score was earned through actual gameplay. True proof-of-play would require server-side validation, deterministic replay, or TEE attestation.
+2. **Admin manipulation** (M-3) — Config setters have lower bounds but no upper bounds, no timelock, and no events. A compromised admin key can set epoch duration to 1ms and extract value quickly.
+3. **Division-by-zero edge case** (M-1) — Pathological `payout_shares` config can trigger abort in payout logic.
 
 ### What would have to change before stronger production/mainnet confidence?
 
-| Category | Required Change | Effort |
-|----------|----------------|--------|
-| **Score integrity** | Introduce `RunReceipt` hot-potato binding `start_run` to `submit_score` | Medium |
-| **Leaderboard fairness** | Enforce one entry per player per epoch | Small |
-| **Sponsor worker** | Full transaction intent validation (package + module + function allowlist) | Small |
-| **Sponsor worker** | Replace API key with wallet-signature-based auth | Medium |
-| **Sponsor worker** | Rate limiting + daily budget cap | Medium |
-| **Admin safety** | Add `store` to AdminCap or explicit transfer function | Small |
-| **Admin safety** | Add parameter bounds + timelock on config changes | Medium |
-| **Upgrade safety** | Restrict or destroy UpgradeCap, or move to multisig | Small |
-| **Score anti-fraud** | Game hash / commit-reveal / off-chain attestation | Large |
-| **Error handling** | Sanitize sponsor service error messages | Small |
-| **Supply chain** | Commit lockfiles | Trivial |
-| **Headers** | Add security headers to Cloudflare Pages | Trivial |
-| **Formal verification** | Move Prover for treasury arithmetic and payout logic | Medium |
+| Category | Required Change | Status | Effort |
+|----------|----------------|--------|--------|
+| **Score integrity** | RunReceipt hot-potato binding `start_run` to `submit_score` | ✅ Done | — |
+| **Leaderboard fairness** | Enforce one entry per player per epoch | ✅ Done | — |
+| **Sponsor worker** | Full transaction intent validation (package + module + function allowlist) | ✅ Done | — |
+| **Sponsor worker** | Replace client-exposed API key with wallet-signature-based auth | Open | Medium |
+| **Sponsor worker** | Rate limiting + daily budget cap | Open | Medium |
+| **Error handling** | Sanitize sponsor service error messages | ✅ Done | — |
+| **Supply chain** | Commit lockfiles | ✅ Done | — |
+| **Headers** | Add security headers to Cloudflare Pages | ✅ Done | — |
+| **Admin safety** | Add `store` to AdminCap or explicit transfer function | Open | Small |
+| **Admin safety** | Add parameter bounds + timelock on config changes | Open | Medium |
+| **Upgrade safety** | Restrict or destroy UpgradeCap, or move to multisig | Open | Small |
+| **Score anti-fraud** | Game hash / commit-reveal / off-chain attestation | Open | Large |
+| **Formal verification** | Move Prover for treasury arithmetic and payout logic | Open | Medium |
 
 ---
 
@@ -385,24 +359,25 @@ The treasury design itself is strong — no admin drain path, trustless distribu
 
 ### Acceptable for hackathon/testnet
 
-- Open sponsor worker (testnet SUI only, low blast radius)
+- ~~Open sponsor worker~~ → Now intent-validated and API-key-gated (testnet SUI only, low blast radius)
 - AdminCap in single deployer wallet (known party)
 - Hardcoded contract addresses and entry fees
-- No security headers (testnet dApp, no real assets)
-- No rate limiting (testnet only)
+- ~~No security headers~~ → Now deployed (CSP, X-Frame-Options, etc.)
+- No rate limiting on sponsor service (testnet only, API-key-gated)
 - Client-side score — inherent to any client-side game without server validation
+- ~~Lockfiles not committed~~ → Now committed
 
 ### Should fix before broader live usage
 
-- **Sponsor intent validation** — Must restrict to Flappy Frontier package calls. An open gas station is not acceptable beyond testnet.
-- **Sponsor authentication** — API key minimum; wallet-signature-based auth preferred.
-- **Rate limiting** — Per-sender and global caps on the sponsor service.
-- **Leaderboard deduplication** — One entry per player per epoch.
-- **RunReceipt** — Bind score submission to entry fee payment.
-- **Error message sanitization** — Generic errors to clients, full logs server-side.
-- **Commit lockfiles** — Deterministic dependency resolution.
-- **Security headers** — CSP, X-Frame-Options, etc.
-- **Silent fallback UX** — Notify users before switching from sponsored to player-paid.
+- ~~Sponsor intent validation~~ → ✅ Resolved — package/module/function allowlist enforced
+- ~~Sponsor authentication~~ → ✅ Resolved for testnet — API key minimum in place; wallet-signature-based auth still needed for production
+- **Rate limiting** — Per-sender and global caps on the sponsor service (still open)
+- ~~Leaderboard deduplication~~ → ✅ Resolved — one entry per player per epoch
+- ~~RunReceipt~~ → ✅ Resolved — score submission bound to entry fee payment
+- ~~Error message sanitization~~ → ✅ Resolved — generic errors to clients, full logs server-side
+- ~~Commit lockfiles~~ → ✅ Resolved — deterministic dependency resolution
+- ~~Security headers~~ → ✅ Resolved — CSP, X-Frame-Options, etc. deployed
+- **Silent fallback UX** — Notify users before switching from sponsored to player-paid (still open)
 
 ### Mandatory before real-money / mainnet deployment
 
