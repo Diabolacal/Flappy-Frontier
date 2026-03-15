@@ -2,7 +2,7 @@
 
 **Retention:** Carry-forward  
 **Date:** 2026-03-12 (plan) · 2026-03-13 (status correction + repair pass + doc sync + ship replacement + tuning/polish + upscale polish)  
-**Status:** Core loop complete. Scoring human-confirmed. Local best-score persistence human-confirmed. Ship is Frontier vessel (PNG sprite). Gameplay tuning/progression pass, Frontier-orange polish, lightweight audio, and controlled upscale applied. Chain integration live on Stillness (v2 contract). Gas sponsorship enabled. Weekly epoch cadence anchored (no drift). Ready for PR.  
+**Status:** Core loop complete. Scoring human-confirmed. Local best-score persistence human-confirmed. Ship is Frontier vessel (PNG sprite). Gameplay tuning/progression pass, Frontier-orange polish, lightweight audio, and controlled upscale applied. Chain integration live on Stillness (v4 contract). Gas sponsorship enabled. Weekly epoch cadence anchored (no drift). Contract v4 fix: start_run now correctly creates RunReceipt + emits RunReceiptCreatedEvent (v2 had struct defined but function body didn't emit). Ready for PR.  
 **Author:** Planning agent (research-backed); status annotations by implementation agent; regression notes by operator (manual localhost testing); repair pass, ship replacement, tuning/polish, and doc sync by agent  
 **Risk class:** Medium (game loop + new codebase, but no chain integration yet)  
 **Branch:** `feat/game-mvp`

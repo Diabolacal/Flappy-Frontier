@@ -5,6 +5,18 @@
 Newest entries first. See `docs/operations/DECISIONS_TEMPLATE.md` for format.
 
 ---
+## 2026-03-15 — Contract v4 upgrade: Fix start_run RunReceipt creation
+
+- **Goal:** Fix ranked-run blocker — `RunReceiptCreatedEvent not found in transaction events` in production.
+- **Root cause:** On-chain v2 `start_run` function defined `RunReceiptCreatedEvent` struct (for upgrade compatibility) but never emitted it. The function body did not create a `RunReceipt` object or emit the event. Verified by querying the most recent `start_run` tx (`AE2DT21D...`): only `RunStartedEvent` emitted, zero created objects.
+- **Fix:** Published contract v4 upgrade. The local game.move already had correct code (creates RunReceipt, emits both events). No frontend changes needed — parser was already correct.
+- **Files:** `contracts/flappy_frontier/Published.toml` (auto-updated by CLI)
+- **Diff:** 0 LoC manual changes (only Published.toml version bump)
+- **Risk:** High (contract upgrade)
+- **Gates:** typecheck ✅ build ✅ move-build ✅ move-test ✅ (35/35) deploy ✅
+- **V4 Package:** `0x8a5e3de2ff947a0b88f4577f293e8838ea814121bde91d867cb9c13a06574f6e`
+
+---
 ## 2026-03-15 — Fix epoch cadence drift + enable gas sponsorship
 
 - **Goal:** Fix two live issues: (1) epoch advancement drifted because `trigger_payout` set `epoch_start_ms = clock_ms` instead of anchored `epoch_end_ms`. (2) Payout and all game txs were not sponsored because `VITE_SPONSOR_SERVICE_URL` was never set in Cloudflare Pages env.
