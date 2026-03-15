@@ -17,9 +17,9 @@ export const CONTRACT_CONFIG = {
   worldPackageId:
     '0x28b497559d65ab320d9da4613bf2498d5946b2c0ae3597ccfda3072ce127448c',
 
-  /** Published package ID (contains config, game, leaderboard, treasury modules) */
+  /** Published package ID — latest upgrade version for MoveCall targets */
   packageId:
-    '0x355b6228ae72f7cf64632ecd0bc7f13d3e5100f3f06699e45c3294633d9175e6',
+    '0xde1554bde721b2a256ea6b3b21ed08b174308a676216e11df8c651f34353e4eb',
 
   /** AdminCap object — owned by deployer, used for parameter adjustment only */
   adminCapId:

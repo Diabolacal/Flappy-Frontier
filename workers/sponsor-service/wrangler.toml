@@ -6,5 +6,5 @@ compatibility_date = "2025-01-01"
 SUI_RPC_URL = "https://fullnode.testnet.sui.io:443"
 GAS_BUDGET = "50000000"
 ALLOWED_ORIGINS = "https://flappyfrontier.com,https://www.flappyfrontier.com,https://flappy-frontier.pages.dev,http://localhost:5173"
-ALLOWED_PACKAGE_ID = "0x355b6228ae72f7cf64632ecd0bc7f13d3e5100f3f06699e45c3294633d9175e6"
+ALLOWED_PACKAGE_ID = "0xde1554bde721b2a256ea6b3b21ed08b174308a676216e11df8c651f34353e4eb"
 # SPONSOR_API_KEY — set via: wrangler secret put SPONSOR_API_KEY
