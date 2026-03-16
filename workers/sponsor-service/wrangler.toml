@@ -7,4 +7,8 @@ SUI_RPC_URL = "https://fullnode.testnet.sui.io:443"
 GAS_BUDGET = "50000000"
 ALLOWED_ORIGINS = "https://flappyfrontier.com,https://www.flappyfrontier.com,https://flappy-frontier.pages.dev,http://localhost:5173"
 ALLOWED_PACKAGE_ID = "0xde1554bde721b2a256ea6b3b21ed08b174308a676216e11df8c651f34353e4eb"
+# Emergency kill switch: set to "false" to disable all sponsorship immediately.
+SPONSOR_ENABLED = "true"
+# BLOCKED_SENDERS = ""  # Comma-separated sender addresses to deny-list
 # SPONSOR_API_KEY — set via: wrangler secret put SPONSOR_API_KEY
+# SPONSOR_PRIVATE_KEY — set via: wrangler secret put SPONSOR_PRIVATE_KEY

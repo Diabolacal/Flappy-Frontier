@@ -4,13 +4,16 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@mysten/sui": "2.7.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250312.0",
+    "vitest": "^3.0.0",
     "wrangler": "^4.0.0"
   }
 }

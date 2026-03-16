@@ -122,7 +122,7 @@ export async function requestSponsorship(
   const res = await fetch(`${SPONSOR_SERVICE_URL}/sponsor`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ txKindB64, sender }),
+    body: JSON.stringify({ txKindB64, sender, timestamp: Date.now() }),
   });
 
   if (!res.ok) {

@@ -5,19 +5,30 @@
  * The player signs TransactionKind; this service adds gas payment
  * from a dedicated sponsor wallet and co-signs.
  *
+ * SECURITY: The sponsor's gas coin must NEVER be reachable by PTB
+ * commands.  All transaction intent validation is in validation.ts.
+ * See the security audit (2026-03-16) for the full threat model.
+ *
  * API:
  *   POST /sponsor
- *   Body:    { txKindB64: string; sender: string }
+ *   Body:    { txKindB64: string; sender: string; timestamp?: number }
  *   Returns: { txB64: string; sponsorSignature: string }
  *
  * Secrets (set via `wrangler secret put`):
  *   SPONSOR_PRIVATE_KEY — bech32-encoded Sui private key (suiprivkey1...)
+ *   SPONSOR_API_KEY    — shared bearer token for caller authentication
  */
 
 import { SuiJsonRpcClient } from '@mysten/sui/jsonRpc';
 import { Transaction } from '@mysten/sui/transactions';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
+import {
+  validateCommands,
+  auditLog,
+  MAX_BODY_BYTES,
+  MAX_REQUEST_AGE_MS,
+} from './validation';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -34,11 +45,20 @@ interface Env {
   SPONSOR_API_KEY?: string;
   /** Flappy Frontier package ID — only MoveCall targets matching this are sponsored */
   ALLOWED_PACKAGE_ID?: string;
+  /**
+   * Emergency kill switch — set to 'false' to disable all sponsorship.
+   * Defaults to 'true' (enabled) when not set.
+   */
+  SPONSOR_ENABLED?: string;
+  /** Comma-separated sender addresses to block (manual deny-list). */
+  BLOCKED_SENDERS?: string;
 }
 
 interface SponsorRequest {
   txKindB64: string;
   sender: string;
+  /** Client-side timestamp for replay-window validation (ms since epoch). */
+  timestamp?: number;
 }
 
 interface SponsorResponse {
@@ -59,28 +79,6 @@ const DEFAULT_ALLOWED_ORIGINS = [
 
 /** Wildcard suffix patterns — origins ending with these are allowed */
 const ALLOWED_ORIGIN_SUFFIXES = ['.flappy-frontier.pages.dev'];
-
-// ── Intent Validation ──────────────────────────────────────────────
-
-/** Only these game module functions may be sponsored */
-const ALLOWED_FUNCTIONS = new Set([
-  'start_run',
-  'submit_score',
-  'trigger_payout',
-  'discard_receipt',
-]);
-
-/** Only the game orchestration module is allowed */
-const ALLOWED_MODULE = 'game';
-
-/** Max commands per sponsored transaction (PTBs include coin-split helpers) */
-const MAX_COMMANDS = 6;
-
-/** Max request body size in bytes */
-const MAX_BODY_BYTES = 16_384;
-
-/** Command kinds that must never appear in sponsored transactions */
-const DENIED_COMMAND_KINDS = new Set(['Publish', 'Upgrade']);
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -146,7 +144,7 @@ function fromBase64(b64: string): Uint8Array {
 
 // ── Security ───────────────────────────────────────────────────────
 
-/** Verify Bearer token matches the configured API key */
+/** Verify Bearer token matches the configured API key. */
 function checkAuth(request: Request, env: Env): boolean {
   if (!env.SPONSOR_API_KEY) return true; // no key configured = auth disabled
   const auth = request.headers.get('Authorization');
@@ -156,17 +154,38 @@ function checkAuth(request: Request, env: Env): boolean {
   return parts[1] === env.SPONSOR_API_KEY;
 }
 
+/** Check if the sponsor service is enabled (emergency kill switch). */
+function isSponsorEnabled(env: Env): boolean {
+  return env.SPONSOR_ENABLED?.toLowerCase() !== 'false';
+}
+
+/** Check if a sender address is blocked. */
+function isSenderBlocked(sender: string, env: Env): boolean {
+  if (!env.BLOCKED_SENDERS) return false;
+  const blocked = env.BLOCKED_SENDERS.split(',').map((s) => s.trim().toLowerCase());
+  return blocked.includes(sender.toLowerCase());
+}
+
 /**
- * Validate that the TransactionKind only targets Flappy Frontier game functions.
- * Allows supporting PTB commands (SplitCoins, MergeCoins, etc.) but enforces
- * that every MoveCall targets the allowed package/module/function.
+ * Validate that the TransactionKind only targets safe Flappy Frontier operations.
+ *
+ * Defence-in-depth:
+ *  - Fail closed if ALLOWED_PACKAGE_ID is not configured.
+ *  - Command-kind allow-list (no TransferObjects, Publish, Upgrade, etc.).
+ *  - GasCoin reference detection blocks SplitCoins/TransferObjects abuse.
+ *  - MoveCall target validation (package + module + function).
+ *
+ * See validation.ts for the core rules and the 2026-03-16 audit report.
  */
 function validateIntent(
   kindBytes: Uint8Array,
   env: Env,
-): { valid: boolean; reason?: string } {
+): { valid: boolean; reason?: string; commandKinds?: string[] } {
   const packageId = env.ALLOWED_PACKAGE_ID;
-  if (!packageId) return { valid: true }; // skip if not configured
+  // FAIL CLOSED: refuse to sponsor if package allowlist is not configured.
+  if (!packageId) {
+    return { valid: false, reason: 'Package allowlist not configured' };
+  }
 
   let tx: Transaction;
   try {
@@ -175,49 +194,18 @@ function validateIntent(
     return { valid: false, reason: 'Malformed transaction' };
   }
 
-  const data = tx.getData();
-  const commands: Array<{ $kind: string; [key: string]: unknown }> =
-    data.commands as Array<{ $kind: string; [key: string]: unknown }>;
+  const commands = tx.getData().commands as Array<{
+    $kind: string;
+    [key: string]: unknown;
+  }>;
 
-  if (!Array.isArray(commands) || commands.length === 0) {
-    return { valid: false, reason: 'Empty transaction' };
-  }
-  if (commands.length > MAX_COMMANDS) {
-    return { valid: false, reason: 'Too many commands' };
-  }
-
-  const normalPkg = packageId.toLowerCase();
-  let hasMoveCall = false;
-
-  for (const cmd of commands) {
-    const kind = cmd.$kind;
-    if (DENIED_COMMAND_KINDS.has(kind)) {
-      return { valid: false, reason: `Disallowed command: ${kind}` };
-    }
-    if (kind !== 'MoveCall') continue;
-    hasMoveCall = true;
-
-    const call = cmd.MoveCall as {
-      package: string;
-      module: string;
-      function: string;
-    };
-    if (call.package.toLowerCase() !== normalPkg) {
-      return { valid: false, reason: 'Disallowed package' };
-    }
-    if (call.module !== ALLOWED_MODULE) {
-      return { valid: false, reason: 'Disallowed module' };
-    }
-    if (!ALLOWED_FUNCTIONS.has(call.function)) {
-      return { valid: false, reason: 'Disallowed function' };
-    }
-  }
-
-  if (!hasMoveCall) {
-    return { valid: false, reason: 'No MoveCall commands' };
-  }
-
-  return { valid: true };
+  const result = validateCommands(commands, packageId);
+  return {
+    ...result,
+    commandKinds: Array.isArray(commands)
+      ? commands.map((c) => c.$kind)
+      : undefined,
+  };
 }
 
 // ── Worker Entry Point ─────────────────────────────────────────────
@@ -238,8 +226,33 @@ export default {
       return jsonResponse({ error: 'Not Found' }, 404, cors);
     }
 
+    const clientIp = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+
+    // ── Emergency kill switch ──
+    if (!isSponsorEnabled(env)) {
+      auditLog({
+        event: 'sponsor_rejected',
+        timestamp: new Date().toISOString(),
+        ip: clientIp,
+        sender: '',
+        reason: 'Service disabled via SPONSOR_ENABLED=false',
+      });
+      return jsonResponse(
+        { error: 'Sponsor service temporarily disabled' },
+        503,
+        cors,
+      );
+    }
+
     // ── Caller authentication ──
     if (!checkAuth(request, env)) {
+      auditLog({
+        event: 'sponsor_rejected',
+        timestamp: new Date().toISOString(),
+        ip: clientIp,
+        sender: '',
+        reason: 'Authentication failed',
+      });
       return jsonResponse({ error: 'Unauthorized' }, 401, cors);
     }
 
@@ -282,6 +295,42 @@ export default {
         );
       }
 
+      // ── Blocked sender check ──
+      if (isSenderBlocked(sender, env)) {
+        auditLog({
+          event: 'sponsor_rejected',
+          timestamp: new Date().toISOString(),
+          ip: clientIp,
+          sender,
+          reason: 'Sender is blocked',
+        });
+        return jsonResponse(
+          { error: 'Sponsorship unavailable' },
+          403,
+          cors,
+        );
+      }
+
+      // ── Replay-window check ──
+      const { timestamp: reqTimestamp } = body as SponsorRequest;
+      if (typeof reqTimestamp === 'number') {
+        const age = Math.abs(Date.now() - reqTimestamp);
+        if (age > MAX_REQUEST_AGE_MS) {
+          auditLog({
+            event: 'sponsor_rejected',
+            timestamp: new Date().toISOString(),
+            ip: clientIp,
+            sender,
+            reason: `Request timestamp too old (${age}ms)`,
+          });
+          return jsonResponse(
+            { error: 'Request expired — please retry' },
+            400,
+            cors,
+          );
+        }
+      }
+
       // Reconstruct sponsor keypair from secret
       const { secretKey } = decodeSuiPrivateKey(env.SPONSOR_PRIVATE_KEY);
       const keypair = Ed25519Keypair.fromSecretKey(secretKey);
@@ -294,12 +343,20 @@ export default {
       // Reconstruct transaction from kind bytes, add gas sponsorship
       const kindBytes = fromBase64(txKindB64);
 
-      // ── Intent validation ──
+      // ── Intent validation (defence-in-depth) ──
       const intent = validateIntent(kindBytes, env);
       if (!intent.valid) {
-        console.warn('[sponsor-service] Intent rejected:', intent.reason);
+        auditLog({
+          event: 'sponsor_rejected',
+          timestamp: new Date().toISOString(),
+          ip: clientIp,
+          sender,
+          commandKinds: intent.commandKinds,
+          reason: intent.reason,
+        });
+        // Return generic rejection — do not leak validation details to attacker
         return jsonResponse(
-          { error: `Transaction rejected: ${intent.reason}` },
+          { error: 'Transaction not eligible for sponsorship' },
           403,
           cors,
         );
@@ -329,13 +386,26 @@ export default {
         sponsorSignature,
       };
 
+      auditLog({
+        event: 'sponsor_approved',
+        timestamp: new Date().toISOString(),
+        ip: clientIp,
+        sender,
+        commandKinds: intent.commandKinds,
+      });
+
       return jsonResponse(response, 200, cors);
     } catch (err) {
-      // Log full error server-side; return generic message to client (M-4)
-      console.error(
-        '[sponsor-service] Error:',
-        err instanceof Error ? err.message : err,
-      );
+      // Log full error server-side; return generic message to client
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error('[sponsor-service] Error:', errMsg);
+      auditLog({
+        event: 'sponsor_error',
+        timestamp: new Date().toISOString(),
+        ip: clientIp,
+        sender: '',
+        reason: errMsg,
+      });
       return jsonResponse(
         { error: 'Sponsorship failed. Please try again.' },
         500,
