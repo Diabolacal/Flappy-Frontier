@@ -97,7 +97,7 @@ export function GamePage({ ssuWallet }: GamePageProps) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to start ranked run';
         if (msg.includes('No EVE coins') || msg.includes('Insufficient EVE')) {
-          setRankedError('Not enough EVE for the entry fee. Open Keeper > Wallet > Open Currency Exchange and swap LUX to EVE (10 LUX = 100 EVE).');
+          setRankedError('Not enough EVE for the entry fee. Open Keeper > Wallet > Open Currency Exchange and swap LUX to EVE (10,000 LUX = 100 EVE).');
         } else if (msg.includes('insufficient') || msg.includes('gas')) {
           setRankedError(
             sponsorship.canSponsorGameTx
@@ -362,7 +362,7 @@ export function GamePage({ ssuWallet }: GamePageProps) {
         {/* Ranked error toast */}
         {rankedError && screenState === 'menu' && (
           <div className="absolute bottom-4 left-4 right-4 bg-red-900/90 border border-red-700
-                          rounded-lg p-3 text-red-200 text-sm z-20">
+                          rounded-lg p-3 text-red-200 text-sm z-[40]">
             <div className="font-bold mb-1">Ranked run failed</div>
             <div className="text-xs mb-1">{rankedError}</div>
             <div className="text-xs text-red-400/60">
