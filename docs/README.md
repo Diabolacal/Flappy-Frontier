@@ -58,4 +58,7 @@ Central map for all project documentation. Agents: start here for orientation.
 
 ## Demo
 
-*Demo scripts and narration specs will be added closer to submission.*
+| Document | Description |
+|----------|-------------|
+| `docs/demo/flappy-frontier-submission-fact-pack.md` | Submission-ready fact pack — verified feature list, deployment IDs, safe claims, caveats |
+| `docs/demo/flappy-frontier-demo-script.md` | Demo video script — 80s full version + 55s tighter cut, shot list, recording notes |
