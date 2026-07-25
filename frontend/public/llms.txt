@@ -9,12 +9,12 @@ https://flappy-frontier.pages.dev/
 Flappy Frontier is a browser-based side-scrolling game inspired by Flappy Bird, set in the EVE Frontier universe. Players navigate a spaceship through asteroid pipes. The game offers two modes:
 
 - **Practice mode:** Free to play, no wallet required. Play directly in any browser or inside the EVE Frontier in-game browser.
-- **Ranked mode:** Connect a Sui wallet, pay a small EVE token entry fee, and compete for a spot on the on-chain leaderboard. Top players earn weekly EVE prize payouts.
+- **Ranked mode (RETIRED here):** the standalone ranked mode with entry fees and weekly prize payouts is retired. The game now lives inside EF-Map (ef-map.com) with free ranked play, paid 100 EVE revives via Frontier Commerce, and NO prizes.
 
 ## Key Features
 - Canvas 2D game loop running at 60fps with delta-time physics
 - On-chain leaderboard and score submission via Sui Move smart contracts
-- Weekly automated prize payouts from the treasury
+- (Retired) weekly automated prize payouts from the treasury — removed in the EF-Map model
 - Provably fair game seeding using sui::random
 - Gas-sponsored transactions for seamless gameplay
 - Playable inside the EVE Frontier in-game browser (787×1198px portrait webview)
