@@ -6,8 +6,9 @@
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0a0a0a" />
 
-    <title>Flappy Frontier — Ranked Flappy Bird on Sui &amp; EVE Frontier</title>
-    <meta name="description" content="A ranked Flappy Bird-style minigame built on Sui for the EVE Frontier hackathon. Practice for free or compete on-chain for weekly EVE prizes." />
+    <title>Flappy Frontier (retired) — the game has moved into EF-Map</title>
+    <meta name="description" content="The standalone Flappy Frontier site is retired. The game has moved into EF-Map. Ranked play and payments are disabled here; free practice still works." />
+    <meta name="robots" content="noindex" />
     <link rel="canonical" href="https://flappy-frontier.pages.dev/" />
 
     <!-- Open Graph (compact card) -->
@@ -53,12 +54,54 @@
         "@type": "Offer",
         "price": "0",
         "priceCurrency": "USD",
-        "description": "Free to practice. Entry fee in EVE token for ranked play."
+        "description": "Free to practice. Ranked play and payments are retired."
       }
     }
     </script>
+
+    <!-- Retirement notice (added 2026-07-25). Remove this block when this site
+         is replaced by a redirect to ef-map.com after the EF-Map integration
+         ships to production. -->
+    <style>
+      #ff-retired-notice {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 2147483647;
+        box-sizing: border-box;
+        padding: 10px 14px;
+        background: #1b0f0a;
+        border-bottom: 2px solid #ff4c26;
+        color: #ffe9e2;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 13px;
+        line-height: 1.45;
+        text-align: center;
+      }
+      #ff-retired-notice strong { color: #ff8a66; font-weight: 600; }
+      #ff-retired-notice a { color: #ff8a66; }
+      #ff-retired-notice button {
+        margin-left: 10px;
+        padding: 2px 8px;
+        background: transparent;
+        border: 1px solid #ff8a66;
+        border-radius: 3px;
+        color: #ff8a66;
+        font: inherit;
+        cursor: pointer;
+      }
+      @media (max-width: 640px) { #ff-retired-notice { font-size: 12px; padding: 8px 10px; } }
+    </style>
   </head>
   <body class="bg-black m-0 p-0">
+    <div id="ff-retired-notice" role="status">
+      <strong>Flappy Frontier has moved into EF-Map.</strong>
+      This standalone version is retired. Ranked play and payments are disabled here, and any ranked
+      run you start will fail. Free practice still works. The game will be at
+      <a href="https://ef-map.com/">ef-map.com</a> once the new version ships.
+      <button type="button" onclick="this.parentNode.remove()">Dismiss</button>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
