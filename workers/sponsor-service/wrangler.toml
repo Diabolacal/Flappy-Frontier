@@ -1,3 +1,30 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# RETIRED 2026-07-25. This Worker no longer sponsors anything.
+#
+# `SPONSOR_ENABLED` is "false" below, and the `SPONSOR_PRIVATE_KEY` secret has
+# been deleted from the deployed Worker, so `POST /sponsor` fails closed with
+# 503 on two independent paths. The Worker is deliberately left deployed rather
+# than deleted, so this config plus a `wrangler secret put SPONSOR_PRIVATE_KEY`
+# is a complete rollback if it is ever needed.
+#
+# Nothing depends on it:
+#   - CivilizationControl cut over to its own `civilizationcontrol-sponsor`
+#     Worker on 2026-04-28 and kept this one only as a soak-window rollback.
+#     Its live production bundle contains `civilizationcontrol-sponsor` and
+#     zero occurrences of `flappy-frontier-sponsor`. The stale
+#     `civilization-control` entry in APP_POLICIES below is inert.
+#   - EF-Map, which is where the game now lives, uses the VPS-hosted Frontier
+#     Commerce gas station (`ef-commerce-sponsor`), a completely different
+#     service. Do NOT confuse the two, and do NOT touch that one.
+#   - The standalone Flappy frontend it was built for is retired.
+#
+# The old sponsor wallet (0x0d6fa6c3…) is abandoned; its remaining testnet SUI
+# is disposable and was deliberately not moved. The local private-key file was
+# deleted after this change.
+#
+# Everything below is left as-is for the historical record.
+# ─────────────────────────────────────────────────────────────────────────────
+
 name = "flappy-frontier-sponsor"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
@@ -5,10 +32,17 @@ compatibility_date = "2025-01-01"
 [vars]
 SUI_RPC_URL = "https://fullnode.testnet.sui.io:443"
 GAS_BUDGET = "50000000"
-ALLOWED_ORIGINS = "https://flappyfrontier.com,https://www.flappyfrontier.com,https://flappy-frontier.pages.dev,http://localhost:5173"
-ALLOWED_PACKAGE_ID = "0xde1554bde721b2a256ea6b3b21ed08b174308a676216e11df8c651f34353e4eb"
+ALLOWED_ORIGINS = "https://flappyfrontier.com,https://www.flappyfrontier.com,https://flappy-frontier.pages.dev,https://civilizationcontrol.pages.dev,https://civilizationcontrol.com,https://www.civilizationcontrol.com,http://localhost:5173"
+ALLOWED_ORIGIN_SUFFIXES = ".flappy-frontier.pages.dev,.civilizationcontrol.pages.dev"
+# APP_POLICIES: JSON array of sponsored app configs.
+# Shape: [{ id, packageId?, targets?, packages?, maxCommands? }]
+# - Single-package apps use `packageId` + `targets` (e.g. Flappy Frontier).
+# - Multi-package apps use `packages: { pkgId: { module: [fns] } }` (e.g. CivilizationControl).
+APP_POLICIES = '[{"id":"flappy-frontier","packageId":"0xde1554bde721b2a256ea6b3b21ed08b174308a676216e11df8c651f34353e4eb","targets":{"game":["start_run","submit_score","trigger_payout","discard_receipt"]}},{"id":"civilization-control","packages":{"0x28b497559d65ab320d9da4613bf2498d5946b2c0ae3597ccfda3072ce127448c":{"character":["borrow_owner_cap","return_owner_cap"],"gate":["authorize_extension","update_metadata_url","online","offline"],"turret":["authorize_extension","online","offline"]},"0x902948c11c7291a7b64d150291283548dad878c84b6a0db279c57535d5971021":{"gate_control":["set_policy_preset","remove_policy_preset","set_treasury"],"posture":["set_posture"]}},"maxCommands":200}]'
 # Emergency kill switch: set to "false" to disable all sponsorship immediately.
-SPONSOR_ENABLED = "true"
+# RETIRED 2026-07-25 — held at "false" on purpose. Do not flip back to "true"
+# without a deliberate un-retirement decision (see header).
+SPONSOR_ENABLED = "false"
 # BLOCKED_SENDERS = ""  # Comma-separated sender addresses to deny-list
 # SPONSOR_API_KEY — set via: wrangler secret put SPONSOR_API_KEY
 # SPONSOR_PRIVATE_KEY — set via: wrangler secret put SPONSOR_PRIVATE_KEY

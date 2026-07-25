@@ -1,10 +1,18 @@
 # Flappy Frontier — LLM Documentation Index
 
-> Machine-readable project map for LLM agents. Updated: 2026-03-12.
+> Machine-readable project map for LLM agents. Updated: 2026-07-25.
+
+## STATUS — READ FIRST
+- The standalone game is RETIRED. The playable game was ported natively into EF-Map (Diabolacal/EF-Map, branch feat/flappy-frontier-games, draft PR #80 — preview-tested, NOT merged, NOT in production).
+- Old economics are GONE: no entry fee, no prize pool, no weekly top-3 payout, no token rewards for placement.
+- CURRENT on-chain package: contracts/flappy_frontier_v2/ (modules board + game) — coin-free, cycle-agnostic. Testnet package 0x03150b4e0d68ae6a97a97fb47281d40c4f84aeb0182a769c3864ab104db85441, Board 0x9ec1e43310fc4553e33ff75117f361efc6d40cb8c3789f2121b6cb2860635e21.
+- DEPRECATED: contracts/flappy_frontier/ (v1), its Treasury, the old-cycle EVE type 0x2a66...::EVE::EVE, and the flappy-frontier-sponsor Cloudflare Worker.
+- Revive purchases (100 EVE at death) run through the separate Frontier Commerce EF Arcade merchant, not this repo.
+- Current state: README.md (root) and docs/decision-log.md. Everything else in docs/ is historical.
 
 ## Project Identity
 - Name: Flappy Frontier
-- Type: Hackathon submission (EVE Frontier, March 2026)
+- Type: Historical hackathon submission (EVE Frontier, March 2026) + home of the current flappy_frontier_v2 Move package
 - Stack: Canvas 2D + React + Vite (frontend) | Sui Move (contracts) | Cloudflare Pages (deploy)
 
 ## Critical Agent Files
@@ -19,8 +27,9 @@
 - docs/core/hackathon-repo-conventions.md — Git workflow, file discipline, naming conventions
 
 ## Code Entry Points
-- contracts/flappy_frontier/ — Sui Move package (leaderboard, treasury, game seeding)
-- frontend/ — React + Canvas 2D game (to be created)
+- contracts/flappy_frontier_v2/ — CURRENT Sui Move package (board + game, no economics)
+- contracts/flappy_frontier/ — DEPRECATED v1 Sui Move package (leaderboard, treasury, game seeding)
+- frontend/ — RETIRED standalone React + Canvas 2D game (Pages site now serves a retirement notice)
 - vendor/ — Git submodules (world-contracts, builder-scaffold, evevault, builder-documentation)
 
 ## Key Constraints

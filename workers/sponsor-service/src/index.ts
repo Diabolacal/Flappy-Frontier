@@ -1,9 +1,13 @@
 /**
- * Flappy Frontier — Gas Sponsor Service (Cloudflare Worker)
+ * Multi-App Gas Sponsor Service (Cloudflare Worker)
  *
- * Implements Sui-native dual-signature gas sponsorship.
+ * Implements Sui-native dual-signature gas sponsorship for multiple apps.
  * The player signs TransactionKind; this service adds gas payment
  * from a dedicated sponsor wallet and co-signs.
+ *
+ * Supported apps are configured via the APP_POLICIES env var (JSON array).
+ * Each policy defines an allowed package ID, module/function targets, and
+ * per-app command limit.  Cross-app PTBs are rejected.
  *
  * SECURITY: The sponsor's gas coin must NEVER be reachable by PTB
  * commands.  All transaction intent validation is in validation.ts.
@@ -25,9 +29,12 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 import {
   validateCommands,
+  parseAppPolicies,
   auditLog,
   MAX_BODY_BYTES,
   MAX_REQUEST_AGE_MS,
+  type AppPolicyConfig,
+  type AppPolicy,
 } from './validation';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -43,8 +50,13 @@ interface Env {
   GAS_BUDGET?: string;
   /** Shared secret API key — callers must send Authorization: Bearer <key> */
   SPONSOR_API_KEY?: string;
-  /** Flappy Frontier package ID — only MoveCall targets matching this are sponsored */
-  ALLOWED_PACKAGE_ID?: string;
+  /**
+   * JSON array of app policy configs.  Each entry defines a sponsored app:
+   * [{ "id": "app-name", "packageId": "0x...", "targets": { "module": ["fn1"] } }]
+   */
+  APP_POLICIES?: string;
+  /** Comma-separated hostname suffixes for preview-deploy CORS (e.g. ".my-app.pages.dev") */
+  ALLOWED_ORIGIN_SUFFIXES?: string;
   /**
    * Emergency kill switch — set to 'false' to disable all sponsorship.
    * Defaults to 'true' (enabled) when not set.
@@ -77,8 +89,11 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:5173',
 ];
 
-/** Wildcard suffix patterns — origins ending with these are allowed */
-const ALLOWED_ORIGIN_SUFFIXES = ['.flappy-frontier.pages.dev'];
+/** Default wildcard suffix patterns for CF Pages preview deploys */
+const DEFAULT_ORIGIN_SUFFIXES = [
+  '.flappy-frontier.pages.dev',
+  '.civilizationcontrol.pages.dev',
+];
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -89,16 +104,23 @@ function getAllowedOrigins(env: Env): string[] {
   return DEFAULT_ALLOWED_ORIGINS;
 }
 
+function getOriginSuffixes(env: Env): string[] {
+  if (env.ALLOWED_ORIGIN_SUFFIXES) {
+    return env.ALLOWED_ORIGIN_SUFFIXES.split(',').map((s) => s.trim());
+  }
+  return DEFAULT_ORIGIN_SUFFIXES;
+}
+
 /** Check if an origin is allowed (exact match OR wildcard suffix match) */
 function isOriginAllowed(origin: string, env: Env): boolean {
   const allowed = getAllowedOrigins(env);
   if (allowed.includes(origin)) return true;
 
-  // Wildcard: allow any *.flappy-frontier.pages.dev subdomain (preview deploys)
+  // Wildcard: allow any preview deploy subdomain (e.g. *.flappy-frontier.pages.dev)
   try {
     const { hostname, protocol } = new URL(origin);
     if (protocol !== 'https:') return false;
-    return ALLOWED_ORIGIN_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
+    return getOriginSuffixes(env).some((suffix) => hostname.endsWith(suffix));
   } catch {
     return false;
   }
@@ -166,25 +188,37 @@ function isSenderBlocked(sender: string, env: Env): boolean {
   return blocked.includes(sender.toLowerCase());
 }
 
+/** Parse APP_POLICIES env var into validated policies. Returns empty array if misconfigured. */
+function loadPolicies(env: Env): AppPolicy[] {
+  if (!env.APP_POLICIES) return [];
+  try {
+    const configs: AppPolicyConfig[] = JSON.parse(env.APP_POLICIES);
+    return parseAppPolicies(configs);
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Validate that the TransactionKind only targets safe Flappy Frontier operations.
+ * Validate that the TransactionKind targets an allowed app operation.
  *
  * Defence-in-depth:
- *  - Fail closed if ALLOWED_PACKAGE_ID is not configured.
+ *  - Fail closed if APP_POLICIES is not configured.
+ *  - Per-app package / module / function allow-lists.
  *  - Command-kind allow-list (no TransferObjects, Publish, Upgrade, etc.).
  *  - GasCoin reference detection blocks SplitCoins/TransferObjects abuse.
- *  - MoveCall target validation (package + module + function).
+ *  - Cross-app PTBs rejected (all MoveCall commands must match one policy).
  *
  * See validation.ts for the core rules and the 2026-03-16 audit report.
  */
 function validateIntent(
   kindBytes: Uint8Array,
   env: Env,
-): { valid: boolean; reason?: string; commandKinds?: string[] } {
-  const packageId = env.ALLOWED_PACKAGE_ID;
-  // FAIL CLOSED: refuse to sponsor if package allowlist is not configured.
-  if (!packageId) {
-    return { valid: false, reason: 'Package allowlist not configured' };
+): { valid: boolean; reason?: string; commandKinds?: string[]; matchedApp?: string } {
+  const policies = loadPolicies(env);
+  // FAIL CLOSED: refuse to sponsor if no policies are configured.
+  if (policies.length === 0) {
+    return { valid: false, reason: 'App policies not configured' };
   }
 
   let tx: Transaction;
@@ -199,7 +233,7 @@ function validateIntent(
     [key: string]: unknown;
   }>;
 
-  const result = validateCommands(commands, packageId);
+  const result = validateCommands(commands, policies);
   return {
     ...result,
     commandKinds: Array.isArray(commands)
@@ -351,6 +385,7 @@ export default {
           timestamp: new Date().toISOString(),
           ip: clientIp,
           sender,
+          app: intent.matchedApp,
           commandKinds: intent.commandKinds,
           reason: intent.reason,
         });
@@ -391,6 +426,7 @@ export default {
         timestamp: new Date().toISOString(),
         ip: clientIp,
         sender,
+        app: intent.matchedApp,
         commandKinds: intent.commandKinds,
       });
 

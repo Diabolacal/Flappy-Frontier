@@ -1,6 +1,23 @@
 /**
- * On-chain contract configuration for Flappy Frontier.
- * Populated with Sui testnet (Stillness) object IDs.
+ * DEPRECATED — v1 standalone config. Do not use for new work.
+ *
+ * Every ID below belongs to the retired v1 package: entry fee, Treasury<EVE>,
+ * weekly top-3 payout, and an EVE coin type from an old cycle. The ranked path
+ * these IDs describe is dead on purpose. The standalone sponsor worker that
+ * co-signed those transactions has been retired as well (signing key removed),
+ * so nothing here can execute even if it is called.
+ *
+ * The CURRENT on-chain package is `contracts/flappy_frontier_v2/` — modules
+ * `board` + `game`, coin-free and cycle-agnostic, with no fee, pool or payout.
+ * Testnet package 0x03150b4e0d68ae6a97a97fb47281d40c4f84aeb0182a769c3864ab104db85441,
+ * Board 0x9ec1e43310fc4553e33ff75117f361efc6d40cb8c3789f2121b6cb2860635e21.
+ * See `contracts/flappy_frontier_v2/DEPLOYMENT.testnet.json` and the root README.
+ *
+ * The playable game now lives inside EF-Map, which holds its own config for v2.
+ * This file is kept only so the historical standalone frontend still builds;
+ * its behaviour is intentionally unchanged.
+ *
+ * On-chain contract configuration for Flappy Frontier (v1, Stillness testnet).
  *
  * Publish tx:  AoCPM4PTDzCnRGK1kAux9tQmg3mYgWobxpSpV73V4nNN
  * Init treasury tx: 7kwvmWFxCS8Qy7mwJyWnYowTEuvw5cAxcUxBZc5pPJ75

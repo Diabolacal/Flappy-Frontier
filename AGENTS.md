@@ -1,5 +1,7 @@
 # Agents Context — Flappy Frontier (Hackathon Submission Repo)
 
+> **STATUS (2026-07-25) — read before acting on anything below.** The standalone game is retired. The playable game has been ported natively into EF-Map (`Diabolacal/EF-Map`, branch `feat/flappy-frontier-games`, draft PR #80: preview-tested with a real wallet, not merged, not in production; it will be on ef-map.com once merged). The old economics are gone: no entry fee, no prize pool, no weekly top-3 payout, no token rewards for placement. The current on-chain package from this repo is `contracts/flappy_frontier_v2/` (modules `board` + `game`), coin-free and cycle-agnostic, testnet package `0x03150b4e0d68ae6a97a97fb47281d40c4f84aeb0182a769c3864ab104db85441`, Board `0x9ec1e43310fc4553e33ff75117f361efc6d40cb8c3789f2121b6cb2860635e21`. Revive purchases (100 EVE at death) run through the separate Frontier Commerce EF Arcade merchant, not this repo. The v1 package, its Treasury, the old-cycle EVE type and the `flappy-frontier-sponsor` Worker are all deprecated/retired. Current state lives in the root `README.md` and `docs/decision-log.md`.
+
 Purpose: Provide persistent, high-signal context and guardrails for agent mode in this repository. VS Code will automatically ingest this file (1.104+). Keep it short and link out for depth.
 
 ## Workflow primer
@@ -11,11 +13,12 @@ Purpose: Provide persistent, high-signal context and guardrails for agent mode i
 
 ## Project quick facts
 
-- **What:** Flappy Bird-style side-scrolling game for EVE Frontier hackathon, backed by Sui smart contracts
-- **Frontend:** Vite + React + Canvas 2D game loop (deployed to Cloudflare Pages)
-- **Contracts:** Sui Move — `contracts/flappy_frontier/` (Leaderboard, Treasury, game seeding via `sui::random`)
-- **In-game:** Loadable in EVE Frontier CEF webview (787×1198px portrait, Chrome 122, no Sui wallet — free-play only)
-- **Data flow:** Player → Canvas 2D → Sui wallet → Move contracts (entry fee, score submission, weekly payout)
+- **What:** historical standalone Flappy Bird-style game for EVE Frontier, plus the current `flappy_frontier_v2` Move package. The playable game now lives in EF-Map.
+- **Current contracts:** Sui Move — `contracts/flappy_frontier_v2/` (`board` + `game`; weekly leaderboard, `sui::random` week seed, no coin/balance/generic `<T>`, AdminCap is tuning-only)
+- **Deprecated contracts:** `contracts/flappy_frontier/` (v1: Leaderboard, Treasury, entry fee, payout) — deployed but unused
+- **Retired frontend:** `frontend/` — the standalone Vite + React + Canvas 2D build on `flappy-frontier.pages.dev`, now serving a retirement notice
+- **Retired worker:** `workers/sponsor-service/` — the `flappy-frontier-sponsor` Cloudflare Worker. CivilizationControl moved to its own `civilizationcontrol-sponsor` on 2026-04-28; EF-Map uses the VPS Frontier Commerce gas station. Neither depends on this one.
+- **Current data flow:** player plays in EF-Map, EF-Map calls `flappy_frontier_v2` for `start_run` / `submit_score`; revives are bought through Frontier Commerce's EF Arcade merchant
 
 > **Glossary note:** If you see "SWE" in voice notes or transcripts, it refers to **Sui** (the blockchain). Transcription tools frequently mishear it.
 

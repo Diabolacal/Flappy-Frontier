@@ -1,5 +1,13 @@
 # Copilot Project Instructions (Flappy Frontier — Hackathon Submission Repo)
 
+> **STATUS (2026-07-25): the standalone deployment and its economics are RETIRED.**
+> Entry fees, the prize pool, weekly payouts and the standalone sponsor worker are gone.
+> The playable game was ported natively into EF-Map (draft PR Diabolacal/EF-Map#80);
+> revives are 100 EVE Frontier Commerce purchases; the active on-chain piece from THIS
+> repo is `contracts/flappy_frontier_v2/` (coin-free weekly leaderboard). Sections below
+> describing fees/treasury/payouts are HISTORICAL context for the v1 code.
+
+
 Purpose: Authoritative source of truth for AI agent guardrails, interaction patterns, and workflow conventions in this VS Code project. GitHub Copilot loads this file automatically. Follow the patterns below when adding or modifying code. Optimized for a "vibe coding" workflow: the human provides intent (non‑coder friendly) and the AI agent converts intent into safe, minimal, verifiable changes.
 
 ## Beginner Defaulting
