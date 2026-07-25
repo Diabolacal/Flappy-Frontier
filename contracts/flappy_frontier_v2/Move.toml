@@ -1,0 +1,6 @@
+[package]
+name = "flappy_frontier_v2"
+edition = "2024"
+
+[addresses]
+flappy_frontier_v2 = "0x0"

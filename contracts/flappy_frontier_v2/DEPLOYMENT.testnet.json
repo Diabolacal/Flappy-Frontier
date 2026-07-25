@@ -1,0 +1,19 @@
+{
+  "network": "testnet",
+  "chainId": "4c78adac",
+  "packageId": "0x03150b4e0d68ae6a97a97fb47281d40c4f84aeb0182a769c3864ab104db85441",
+  "originalPackageId": "0x03150b4e0d68ae6a97a97fb47281d40c4f84aeb0182a769c3864ab104db85441",
+  "boardId": "0x9ec1e43310fc4553e33ff75117f361efc6d40cb8c3789f2121b6cb2860635e21",
+  "adminCapId": "0xe7b9435696c6928cb76c9dad981437524ef2b1e0a880de3a5e1ffa18f5700788",
+  "upgradeCapId": "0x45cb2496be4c291143a3fc288297f973e1696e40dd51bbbb619603e946d5633f",
+  "publishDigest": "459YsFkuNnzk2iRo654kRwmzTAW5YBCVgCPxnEjvBtRf",
+  "smokeDigests": [
+    "5n13ZPsq9B2BcBDQJdgNc8K7NeFYQppjKKC6Hpu8tEcS",
+    "8wnEee8f8BH5ko94Dje32ntFLoBRfsPYc7NQwCe1zHep"
+  ],
+  "rulesetVersion": 1,
+  "weekAnchorMs": 259200000,
+  "weekMs": 604800000,
+  "deployer": "0xacff13b0630890ac9de62c57ec542de7cad8778aec1fe24f9db19f2457ad54b1",
+  "publishedAt": "2026-07-25T18:28:02Z"
+}

@@ -5,6 +5,23 @@
 Newest entries first. See `docs/operations/DECISIONS_TEMPLATE.md` for format.
 
 ---
+## 2026-07-25 — New `flappy_frontier_v2` package: no economics, cycle-agnostic
+
+- **Goal:** Rebuild the on-chain game package for the relaunch. Drop the entry-fee/prize-pool/payout economics entirely and make the package immune to EVE cycle rollovers.
+- **Decision:** Wrote a FRESH package at `contracts/flappy_frontier_v2/` (two modules, `board` + `game`) rather than upgrading `contracts/flappy_frontier/`. The old package stays deployed and untouched — **deprecated in place**, not upgraded, because removing the fee/payout entry points is a breaking API change and the old `Treasury<T>` is parameterised by an old-cycle EVE coin type.
+- **No economics:** `Coin`, `Balance` and generic `<T>` appear nowhere in v2. No entry fee, no prize pool, no payouts. Revive purchases live in the separate Frontier Commerce package; v2 only records the resulting `revive_count`, bounded by `Board.max_revives`. Because nothing is parameterised by a coin type, **v2 never needs republishing at a cycle rollover** — that was the whole point.
+- **AdminCap is tuning-only:** gates `set_max_size` / `set_ruleset_version` / `set_min_ms_per_point` / `set_max_score` / `set_max_revives`. It cannot write, reorder or delete entries, and there are no funds for it to touch.
+- **Weekly boards, lazily rolled:** `WEEK_ANCHOR_MS = 259_200_000` (1970-01-04, Sunday) + `WEEK_MS = 604_800_000`. The first `start_run` of a new week emits `WeekFinalizedEvent` with the full closing table, clears entries, draws a new `week_seed` from `sui::random`, and emits `WeekStartedEvent`. No cron, no admin action. All players in a week share one seed, so runs are comparable.
+- **Anti-cheat bounds:** `submit_score` has six distinct error codes (sender / ruleset / week / score ceiling 5000 / revive cap 50 / duration plausibility). `min_ms_per_point = 350`, derived from the engine: `PIPE_SPACING 280 px ÷ ENDLESS_SPEED_MAX 340 px/s = 823.5 ms/point` theoretical minimum, taken at ~42.5% for headroom.
+- **`RunTicketCreatedEvent` ships from day one.** The v1 package lost days (see the 2026-03-15 entries) to `start_run` not emitting the receipt's object ID. v2 emits it in the same tx as `RunStartedEvent`, and a test asserts it.
+- **Files:** `contracts/flappy_frontier_v2/{Move.toml,Move.lock,Published.toml,DEPLOYMENT.testnet.json}`, `sources/{board,game}.move`, `tests/{board_tests,game_tests}.move`
+- **Risk:** Low (net-new package; nothing existing touched)
+- **Gates:** `sui move build` ✅ `sui move test` ✅ (39/39) publish ✅ on-chain smoke ✅
+- **Testnet package:** `0x03150b4e0d68ae6a97a97fb47281d40c4f84aeb0182a769c3864ab104db85441` — Board `0x9ec1e433…635e21` (shared), AdminCap `0xe7b94356…700788`, UpgradeCap `0x45cb2496…d5633f`. Publish digest `459YsFkuNnzk2iRo654kRwmzTAW5YBCVgCPxnEjvBtRf`.
+- **Smoke:** `start_run` `5n13ZPsq9B2BcBDQJdgNc8K7NeFYQppjKKC6Hpu8tEcS` (rolled week 0 → 2950, seeded, ticket `0xe933694e…8eef46`) then `submit_score` score 1 `8wnEee8f8BH5ko94Dje32ntFLoBRfsPYc7NQwCe1zHep` — Board now holds the entry.
+- **Follow-ups:** Point the frontend and sponsor worker at the v2 package ID + Board ID (remember: MoveCall targets must name the exact package ID). Wire revive purchases to the Frontier Commerce package.
+
+---
 ## 2026-03-15 — Fix MoveCall package target: v1→v6
 
 - **Goal:** Fix ranked-run blocker — on-chain RunReceiptCreatedEvent never emitted despite v6 contract upgrade.
