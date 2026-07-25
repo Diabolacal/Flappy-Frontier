@@ -8,7 +8,7 @@ What is still current in this repo is the Move package. `contracts/flappy_fronti
 
 ## Where the game is now
 
-The game now lives inside EF-Map, ported natively rather than embedded. That work is on the branch `feat/flappy-frontier-games` in `Diabolacal/EF-Map` as draft PR #80, so it is a draft integration: preview-tested, not merged, and not deployed to production yet. I played a full sponsored ranked run against it with a real wallet on a preview build, including a 100 EVE revive, and the score landed on the weekly board at 21 points with 1 revive. Once it merges it will be on ef-map.com. I'm not linking the preview URL here on purpose, because those are ephemeral and shouldn't be mistaken for a live product.
+The game is live in production inside EF-Map, ported natively rather than embedded. Play it at [https://ef-map.com/?panel=flappy-frontier](https://ef-map.com/?panel=flappy-frontier). The integration merged via `Diabolacal/EF-Map` PR #80 (merge commit `2a76cfc9`) and deployed to production on 2026-07-26. Before merging I played a full sponsored ranked run against it with a real wallet, including a 100 EVE revive, and the score landed on the weekly board at 21 points with 1 revive. The old standalone domains (`flappyfrontier.com`, `flappy-frontier.pages.dev`) now permanently redirect there.
 
 ## The current on-chain package: flappy_frontier_v2
 
