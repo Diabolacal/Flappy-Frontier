@@ -5,6 +5,18 @@
 Newest entries first. See `docs/operations/DECISIONS_TEMPLATE.md` for format.
 
 ---
+## 2026-07-25 — Docs told a story that stopped being true: repo re-framed as history + v2 package home
+
+- **Goal:** A new reader landing on this repo was being told, by the README and most of `docs/`, that Flappy Frontier is a live standalone site where you pay an entry fee, compete for a prize pool, and get paid out weekly. None of that is true any more, and none of it has been true since the relaunch decision. Fix the entry points so the current state is unmissable, without deleting the history.
+- **What is actually true now:** the playable game has been ported **natively into EF-Map** (`Diabolacal/EF-Map`, branch `feat/flappy-frontier-games`, draft PR #80). That is a **draft/preview integration**: the operator preview-tested it end to end with a real wallet (sponsored ranked run, a 100 EVE revive, final score 21 with 1 revive landing on the weekly board), but it is **not merged and not production-deployed**. It will be on `ef-map.com` once merged. No preview URL is linked from any doc, because preview URLs are ephemeral and must not read as a live product.
+- **What is retired:** entry fee, prize pool, `Treasury<EVE>`, weekly top-3 50/30/20 payout, `trigger_payout`, and any token reward for placement. The leaderboard is now only a leaderboard. The only payment left is a **revive, 100 EVE, charged at death**, and it runs through the separate **Frontier Commerce EF Arcade merchant** — no payment code for it exists in this repo.
+- **What is current:** `contracts/flappy_frontier_v2/` — coin-free, cycle-agnostic, testnet package `0x03150b4e…db85441`, Board `0x9ec1e433…635e21`. Deprecated: v1 package (`0x355b…` original / `0xde15…` v6), its Treasury, old-cycle EVE type `0x2a66…::EVE::EVE`, and the standalone sponsor worker.
+- **Decision — banner, don't delete:** history stays in the repo and stays readable. `README.md` now opens with current state and pushes the entire original write-up below a hard `# Historical (v1 standalone)` banner. Individual archive docs got a one-paragraph `HISTORICAL DOCUMENT` banner directly under their H1 rather than being rewritten, because rewriting an archive destroys the evidence of what was actually built and claimed at the time.
+- **Files:** `README.md` (top rewritten, historical banner inserted, v1 deployment table and layer table marked RETIRED/DEPRECATED), `docs/README.md` (status banner, current-package table, per-row HISTORICAL markers), `AGENTS.md` (status banner + quick facts rewritten), `llms.txt` (STATUS block + entry points), `docs/demo/flappy-frontier-submission-fact-pack.md`, `docs/demo/flappy-frontier-demo-script.md`, `docs/strategy/flappy-frontier-product-vision.md`, `docs/plans/flappy-frontier-chain-integration-plan.md` (banners), `frontend/src/lib/contractConfig.ts` (deprecation header comment only, zero behaviour change).
+- **Risk:** Low (documentation + one comment block; no runtime code touched)
+- **Follow-ups:** After EF-Map PR #80 merges and deploys to production, revisit the README wording from "pending merge" to "live at ef-map.com".
+
+---
 ## 2026-07-25 — New `flappy_frontier_v2` package: no economics, cycle-agnostic
 
 - **Goal:** Rebuild the on-chain game package for the relaunch. Drop the entry-fee/prize-pool/payout economics entirely and make the package immune to EVE cycle rollovers.

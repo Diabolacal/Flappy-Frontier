@@ -1,12 +1,55 @@
 # Flappy Frontier
 
-A ranked Flappy Bird-style minigame on [Sui](https://sui.io/), built for the [EVE Frontier](https://www.evefrontier.com/) hackathon. The gameplay is intentionally simple. The point is the infrastructure around it.
+**Status: the standalone game is retired. The playable game has moved into EF-Map. This repo is the history of the original project, and the home of the current on-chain leaderboard package.**
 
-Players pay an entry fee in EVE tokens, receive a provably fair on-chain seed, fly through deterministic obstacles, and submit scores to a transparent leaderboard. Every week, the prize pool is distributed to the top 3 players automatically, with no admin key and no manual payout step.
+I built Flappy Frontier for the [EVE Frontier](https://www.evefrontier.com/) builder hackathon in March 2026, as a standalone site on [Sui](https://sui.io/) with its own wallet flow, its own entry fee and its own prize pool. That version is finished. The game itself was the part people actually liked, so it has been ported natively into EF-Map, and the economics that surrounded it have been dropped completely.
 
-**[Play now →](https://flappy-frontier.pages.dev/)**
+What is still current in this repo is the Move package. `contracts/flappy_frontier_v2/` is a fresh, coin-free weekly leaderboard package published to Sui testnet, and it is what the EF-Map build talks to. Everything else here, the standalone frontend, the old v1 package, the sponsor worker, is kept for reference and sits below the historical banner further down.
+
+## Where the game is now
+
+The game now lives inside EF-Map, ported natively rather than embedded. That work is on the branch `feat/flappy-frontier-games` in `Diabolacal/EF-Map` as draft PR #80, so it is a draft integration: preview-tested, not merged, and not deployed to production yet. I played a full sponsored ranked run against it with a real wallet on a preview build, including a 100 EVE revive, and the score landed on the weekly board at 21 points with 1 revive. Once it merges it will be on ef-map.com. I'm not linking the preview URL here on purpose, because those are ephemeral and shouldn't be mistaken for a live product.
+
+## The current on-chain package: flappy_frontier_v2
+
+`contracts/flappy_frontier_v2/` is a two-module package, `board` and `game`, with no `Coin`, no `Balance` and no generic `<T>` anywhere in it. There is no entry fee, no prize pool and no payout function. It records scores on a weekly board that rolls over lazily on the first `start_run` of a new week, draws one shared `week_seed` per week from `sui::random` so runs are comparable, and stores `revive_count` as a plain bounded number. Nothing in it is parameterised by a coin type, so it doesn't need republishing when an EVE cycle rolls over. That was the whole reason for writing a new package rather than upgrading v1.
+
+The AdminCap is tuning-only. It gates `set_max_size`, `set_ruleset_version`, `set_min_ms_per_point`, `set_max_score` and `set_max_revives`. It cannot write, reorder or delete entries, and there are no funds for it to touch.
+
+| Object | ID |
+|--------|----|
+| Package (testnet) | `0x03150b4e0d68ae6a97a97fb47281d40c4f84aeb0182a769c3864ab104db85441` |
+| Board (shared) | `0x9ec1e43310fc4553e33ff75117f361efc6d40cb8c3789f2121b6cb2860635e21` |
+| AdminCap | `0xe7b9435696c6928cb76c9dad981437524ef2b1e0a880de3a5e1ffa18f5700788` |
+| UpgradeCap | `0x45cb2496be4c291143a3fc288297f973e1696e40dd51bbbb619603e946d5633f` |
+
+Full publish details, including digests and the week anchor, are in [`contracts/flappy_frontier_v2/DEPLOYMENT.testnet.json`](contracts/flappy_frontier_v2/DEPLOYMENT.testnet.json).
+
+```bash
+sui move build --path contracts/flappy_frontier_v2
+sui move test  --path contracts/flappy_frontier_v2     # 39 tests
+```
+
+## What was retired
+
+The old economics are gone, not paused. There is no entry fee to play a ranked run. There is no prize pool, so the `Treasury<EVE>` object and the whole `Coin<T>` / `Balance<T>` path are dead. There is no weekly top-3 payout, so `trigger_payout` and the 50/30/20 split are gone with it, and no tokens are handed out for placement at all. The leaderboard is now just a leaderboard.
+
+The only money that changes hands is a revive. Those are 100 EVE each, charged at the moment you die, and they run through the separate Frontier Commerce platform's EF Arcade merchant. None of that payment code is in this repo.
+
+The old standalone payment surface is retired too. The v1 package (`0x355b…` original, `0xde15…` v6), its Treasury, the old-cycle EVE type `0x2a66…::EVE::EVE`, and the standalone `flappy-frontier-sponsor` Cloudflare Worker are all deprecated. CivilizationControl moved off that worker to its own `civilizationcontrol-sponsor` on 2026-04-28 and nothing else depends on it. EF-Map's own sponsorship is a different service entirely (the VPS-hosted Frontier Commerce gas station), so retiring the standalone worker doesn't touch it. See `docs/decision-log.md` for exactly what was disabled and when.
+
+The old standalone site at `flappy-frontier.pages.dev` is kept up but carries a retirement notice. Ranked play there is broken by design now, since it points at an old-cycle coin type and a sponsor worker that no longer signs.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ---
+---
+
+# Historical (v1 standalone)
+
+> **Everything below this line describes the original March 2026 hackathon build and is kept for history only. The entry fee, prize pool, weekly payout, sponsor worker and package IDs described below are all retired. Do not treat any of it as current. If you want the current state, read the top of this file.**
 
 ## Why This Matters
 
@@ -44,9 +87,9 @@ Flappy Frontier wraps a simple game around real blockchain infrastructure. It de
 
 | Layer | Technology | Deployment |
 |-------|-----------|------------|
-| **Frontend** | Vite + React + Canvas 2D | [Cloudflare Pages](https://flappy-frontier.pages.dev/) |
-| **Sponsor Service** | Cloudflare Worker | `flappy-frontier-sponsor.*.workers.dev` |
-| **Smart Contracts** | Sui Move (4 modules, 30 tests) | Sui Testnet (Stillness), [package v6](https://suiscan.xyz/testnet/object/0xde1554bde721b2a256ea6b3b21ed08b174308a676216e11df8c651f34353e4eb) |
+| **Frontend** | Vite + React + Canvas 2D | Cloudflare Pages, `flappy-frontier.pages.dev` (RETIRED, now serves a notice) |
+| **Sponsor Service** | Cloudflare Worker | `flappy-frontier-sponsor.*.workers.dev` (RETIRED, signing key removed) |
+| **Smart Contracts** | Sui Move (4 modules, 30 tests) | Sui Testnet (Stillness), package v6 `0xde1554…` (DEPRECATED, superseded by `flappy_frontier_v2`) |
 
 ## Player Flow
 
@@ -110,8 +153,9 @@ sui client active-env                              # Should show testnet
 ## Project Structure
 
 ```
-├── contracts/flappy_frontier/   # Sui Move: config, leaderboard, treasury, game
-├── frontend/                    # Vite + React + Canvas 2D game
+├── contracts/flappy_frontier_v2/ # CURRENT — Sui Move: board + game, no economics
+├── contracts/flappy_frontier/   # DEPRECATED v1 — config, leaderboard, treasury, game
+├── frontend/                    # RETIRED standalone Vite + React + Canvas 2D game
 │   └── src/
 │       ├── app/                 # App shell, providers, SSU detection
 │       ├── features/            # auth (wallet), game (UI), score (leaderboard)
@@ -122,7 +166,9 @@ sui client active-env                              # Should show testnet
 └── vendor/                      # Git submodules (read-only): EVE Frontier references
 ```
 
-## Stillness Deployment (Sui Testnet)
+## Stillness Deployment (Sui Testnet) — DEPRECATED
+
+These are the v1 objects. They are still on chain but nothing points at them any more, and the EVE coin type below is from an old cycle. The current objects are in the `flappy_frontier_v2` table near the top of this file.
 
 | Object | ID |
 |--------|----|
@@ -138,8 +184,4 @@ The game runs inside EVE Frontier's in-game CEF webview (787×1198px portrait, C
 
 ## Hackathon
 
-EVE Frontier Builder Hackathon, March 2026. See [`docs/strategy/flappy-frontier-product-vision.md`](docs/strategy/flappy-frontier-product-vision.md) for the full product vision.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+EVE Frontier Builder Hackathon, March 2026. See [`docs/strategy/flappy-frontier-product-vision.md`](docs/strategy/flappy-frontier-product-vision.md) for the full product vision, which is also a historical document.

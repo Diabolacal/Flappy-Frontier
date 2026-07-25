@@ -1,5 +1,7 @@
 # Flappy Frontier — Submission Fact Pack
 
+> **HISTORICAL DOCUMENT.** This describes the March 2026 standalone build. The standalone game is retired and its economics (entry fee, prize pool, weekly top-3 payout, token rewards for placement) no longer exist. The playable game has been ported natively into EF-Map (draft PR #80, preview-tested, pending merge). The current on-chain package is `contracts/flappy_frontier_v2/`. Read the root `README.md` for current state. Nothing below is a claim about how the project works today.
+
 **Retention:** Carry-forward
 
 Canonical reference for crafting hackathon submission text, Discord pitch copy, and demo narration. Every claim below is verified against the repo as of 2026-03-31. If this document says "implemented," it means the code exists, compiles, passes tests, and is deployed.

@@ -1,5 +1,7 @@
 # Flappy Frontier: Demo Video Script
 
+> **HISTORICAL DOCUMENT.** This describes the March 2026 standalone build. The standalone game is retired and its economics (entry fee, prize pool, weekly top-3 payout, token rewards for placement) no longer exist. The playable game has been ported natively into EF-Map (draft PR #80, preview-tested, pending merge). The current on-chain package is `contracts/flappy_frontier_v2/`. Read the root `README.md` for current state. Nothing below is a claim about how the project works today.
+
 **Retention:** Carry-forward
 
 Voiceover script for a demo video. The footage is one continuous screen recording of gameplay (not edited into separate clips). Voiceover is generated in ElevenLabs and laid over the recording. The narration does not need to match specific on-screen moments.
